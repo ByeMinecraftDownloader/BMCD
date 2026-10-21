@@ -8,6 +8,7 @@ work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
 QT_QPA_PLATFORM=offscreen \
+QT_QUICK_BACKEND=software \
 MC_SCREENSHOT="$work/ui.png" \
 MC_SCREENSHOT_DELAY="${MC_SCREENSHOT_DELAY:-6000}" \
 MC_LOG="$work/ui.log" \

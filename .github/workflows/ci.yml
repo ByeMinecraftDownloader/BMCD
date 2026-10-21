@@ -33,6 +33,13 @@ jobs:
           version: ${{ env.QT_VERSION }}
           cache: true
 
+      - name: Runtime libraries (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libegl1 libgl1 libxkbcommon0 libxkbcommon-x11-0 \
+            libfontconfig1 fonts-dejavu-core
+
       - name: Platform guard (OS code stays in src/platform)
         if: runner.os != 'Windows'
         run: ./scripts/check-platform-guards.sh
@@ -67,13 +74,11 @@ jobs:
       - name: Offscreen UI render (Linux only)
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq libegl1 libgl1 libxkbcommon0 libxkbcommon-x11-0 \
-            libfontconfig1 fonts-dejavu-core
-          QT_QPA_PLATFORM=offscreen MC_SCREENSHOT=ui.png MC_SCREENSHOT_DELAY=6000 \
-            ./build/bmcd --select 26.3
+          QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+            MC_SCREENSHOT=ui.png MC_SCREENSHOT_DELAY=6000 ./build/bmcd --select 26.3
           test -s ui.png
-          QT_QPA_PLATFORM=offscreen timeout 30 ./build/bmcd --benchmark --lang en | tee benchmark.txt
+          QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+            timeout 30 ./build/bmcd --benchmark --lang en | tee benchmark.txt
 
       - name: Package AppImage (Linux)
         if: runner.os == 'Linux'
