@@ -41,7 +41,9 @@ jobs:
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
-        run: cmake --build build --config Release --parallel
+        # The 4-core Linux runner gets killed near the end of an unbounded
+        # parallel build; cap it at two compiler jobs.
+        run: cmake --build build --config Release --parallel 2
 
       - name: Unit tests
         run: ctest --test-dir build --output-on-failure -C Release
