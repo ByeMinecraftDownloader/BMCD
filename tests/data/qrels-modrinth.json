@@ -1,0 +1,14 @@
+{
+  "queries": [
+    { "query": "让游戏跑得更流畅的优化模组", "relevant": ["sodium", "lithium", "ferrite-core", "sodium-extra", "immediatelyfast"] },
+    { "query": "光影 shader 包加载器", "relevant": ["iris", "oculus"] },
+    { "query": "机械动力 齿轮 传送带", "relevant": ["create"] },
+    { "query": "查看合成表和配方", "relevant": ["jei", "emi"] },
+    { "query": "小地图 路径点", "relevant": ["xaeros-minimap", "xaeros-world-map"] },
+    { "query": "自动整理背包和箱子", "relevant": ["inventory-profiles-next"] },
+    { "query": "显示饥饿值和饱食度", "relevant": ["appleskin"] },
+    { "query": "服务端性能优化 区块加载", "relevant": ["lithium", "krypton", "ferrite-core", "c2me-fabric"] },
+    { "query": "实体渲染优化 减少卡顿", "relevant": ["entityculling", "moreculling", "immediatelyfast", "sodium"] },
+    { "query": "音效重制 环境音", "relevant": ["sound-physics-remastered", "ambientsounds"] }
+  ]
+}

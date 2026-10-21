@@ -1,0 +1,15 @@
+[General]
+ColorScheme=AltTest
+[Colors:Window]
+BackgroundNormal=40,10,40
+BackgroundAlternate=50,14,50
+ForegroundNormal=240,228,240
+ForegroundInactive=180,160,180
+DecorationFocus=220,120,220
+[Colors:View]
+BackgroundNormal=40,10,40
+BackgroundAlternate=58,18,58
+ForegroundNormal=240,228,240
+[Colors:Selection]
+BackgroundNormal=220,120,220
+ForegroundNormal=45,0,45

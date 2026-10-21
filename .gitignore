@@ -1,0 +1,22 @@
+# CMake / Ninja
+build/
+dist/
+CMakeCache.txt
+CMakeFiles/
+compile_commands.json
+
+# Packaged artifacts
+*.AppImage
+*.flatpak
+ui.png
+tokens.json
+
+# Bundled deploy tools (downloaded, never source)
+.tools/*.AppImage
+.tools/*.AppImage.zsync
+
+# Editors / OS
+.idea/
+.vscode/
+*.user
+.DS_Store

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.bmcd.BMCD</id>
+  <name>BMCD</name>
+  <summary>Minecraft resource downloader</summary>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>
+      BMCD (Bye!MinecraftDownloader) fetches Minecraft game files: it reads the
+      piston-meta version manifest, resolves a version's asset index and
+      libraries, and downloads the whole file set in parallel with SHA-1
+      verification.
+    </p>
+    <p>
+      The window colours follow the desktop's matugen-generated KDE colour
+      scheme, and update live when the wallpaper changes.
+    </p>
+  </description>
+  <launchable type="desktop-id">org.bmcd.BMCD.desktop</launchable>
+  <url type="homepage">https://github.com/</url>
+  <categories>
+    <category>Game</category>
+    <category>Network</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.4.0" date="2026-10-21">
+      <description>
+        <p>Packaging milestone: AppImage (with Flatpak manifest alongside).</p>
+      </description>
+    </release>
+    <release version="0.3.0" date="2026-10-20">
+      <description>
+        <p>Parallel download queue with SHA-1 verification and installed badges.</p>
+      </description>
+    </release>
+  </releases>
+</component>

@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=BMCD
+GenericName=Minecraft Version Downloader
+Comment=Download vanilla Minecraft versions without a launcher
+Exec=bmcd %U
+Icon=org.bmcd.BMCD
+Terminal=false
+Categories=Game;
+Keywords=minecraft;downloader;vanilla;
+StartupWMClass=bmcd

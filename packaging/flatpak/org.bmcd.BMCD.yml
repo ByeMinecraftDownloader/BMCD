@@ -1,0 +1,41 @@
+app-id: org.bmcd.BMCD
+runtime: org.kde.Platform
+runtime-version: "6.9"
+sdk: org.kde.Sdk
+command: bmcd
+
+finish-args:
+  # Mojang APIs over HTTPS.
+  - --share=network
+  # Native Wayland first, X11 as fallback (niri is Wayland-only, but this keeps
+  # the bundle usable on X11 desktops).
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  # Version downloads land wherever the user points them; the default target is
+  # the user's home, so the sandbox needs access to it.
+  - --filesystem=home
+  # Reading the matugen colour scheme and watching it for changes.
+  - --filesystem=xdg-config/kdeglobals:ro
+  - --filesystem=xdg-data/color-schemes:ro
+  # Notifications / portal file dialog, if the QML side ever uses them.
+  - --talk-name=org.freedesktop.portal.Desktop
+
+cleanup:
+  - /include
+  - /lib/cmake
+  - /lib/pkgconfig
+  - /share/doc
+  - /share/man
+
+modules:
+  - name: bmcd
+    buildsystem: cmake-ninja
+    builddir: true
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+    sources:
+      # BMCD is not a git repository yet, so the manifest consumes the checkout
+      # directly. Switch to `type: git` once the project lives in a repo.
+      - type: dir
+        path: ../..

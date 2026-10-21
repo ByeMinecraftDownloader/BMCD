@@ -1,0 +1,11 @@
+{
+  "queries": [
+    { "query": "Windows 打包为什么会黑框", "relevant": ["windows-stability"] },
+    { "query": "文件被占用 替换失败 怎么处理", "relevant": ["windows-stability"] },
+    { "query": "整合包 manifest 结构和 overrides", "relevant": ["research-mod-download"] },
+    { "query": "Modrinth 搜索接口 facets 怎么写", "relevant": ["research-mod-download"] },
+    { "query": "点菜 烹饪 上菜 是什么", "relevant": ["roadmap-1.0", "ui-spec-1.0"] },
+    { "query": "色板对比度门禁 12 组", "relevant": ["ui-spec-1.0", "roadmap-1.0"] },
+    { "query": "nDCG 和 BM25 基线", "relevant": ["roadmap-1.0"] }
+  ]
+}

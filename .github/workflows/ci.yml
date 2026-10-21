@@ -1,0 +1,127 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  QT_VERSION: 6.7.2
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            name: linux
+          - os: windows-2022
+            name: windows
+          - os: macos-14
+            name: macos
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          cache: true
+
+      - name: Platform guard (OS code stays in src/platform)
+        if: runner.os != 'Windows'
+        run: ./scripts/check-platform-guards.sh
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Unit tests
+        run: ctest --test-dir build --output-on-failure -C Release
+
+      - name: CLI smoke (headless, no display)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            exe=build/Release/bmcd.exe
+          elif [[ "${{ runner.os }}" == "macOS" ]]; then
+            exe=build/bmcd.app/Contents/MacOS/bmcd
+          else
+            exe=build/bmcd
+          fi
+          "$exe" --version
+          "$exe" --i18n-check
+          "$exe" --tokens --light > tokens.json
+          "$exe" --plan 26.3 | tail -3
+
+      - name: Offscreen UI render (Linux only)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libegl1 libgl1 libxkbcommon0 libxkbcommon-x11-0 \
+            libfontconfig1 fonts-dejavu-core
+          QT_QPA_PLATFORM=offscreen MC_SCREENSHOT=ui.png MC_SCREENSHOT_DELAY=6000 \
+            ./build/bmcd --select 26.3
+          test -s ui.png
+          QT_QPA_PLATFORM=offscreen timeout 30 ./build/bmcd --benchmark --lang en | tee benchmark.txt
+
+      - name: Package AppImage (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p .tools
+          base=https://github.com
+          curl -fL -o .tools/linuxdeploy-x86_64.AppImage \
+            "$base/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage"
+          curl -fL -o .tools/linuxdeploy-plugin-qt-x86_64.AppImage \
+            "$base/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage"
+          curl -fL -o .tools/appimagetool-x86_64.AppImage \
+            "$base/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
+          chmod +x .tools/*.AppImage
+          APPIMAGE_EXTRACT_AND_RUN=1 BMCD_SKIP_BUILD=1 packaging/build-appimage.sh
+          test -s build/BMCD-x86_64.AppImage
+
+      - name: Package portable zip (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          windeployqt --release --no-translations --dir dist build/Release/bmcd.exe
+          Compress-Archive -Path dist/* -DestinationPath BMCD-windows-x64.zip
+          if (-not (Test-Path BMCD-windows-x64.zip)) { throw "zip missing" }
+
+      - name: Package dmg (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          macdeployqt build/bmcd.app -dmg -qmldir=qml2
+          test -s build/bmcd.dmg
+
+      - name: Upload packages
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}-package
+          path: |
+            build/BMCD-x86_64.AppImage
+            BMCD-windows-x64.zip
+            build/bmcd.dmg
+          if-no-files-found: ignore
+
+      - name: Upload test artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}-artifacts
+          path: |
+            build/Testing/Temporary/LastTest.log
+            tokens.json
+            ui.png
+            benchmark.txt
+          if-no-files-found: ignore
