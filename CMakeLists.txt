@@ -21,7 +21,27 @@ else()
     set(BMCD_HAVE_ONNXRUNTIME FALSE)
     message(STATUS "RAG: onnxruntime not found, using hashing embedder only")
 endif()
-find_package(ZLIB REQUIRED)
+# Windows has no system zlib and Qt does not expose its bundled copy, so fall
+# back to a pinned source build instead of making every Windows user install
+# vcpkg first. Linux/macOS keep using their system zlib.
+find_package(ZLIB QUIET)
+if(NOT ZLIB_FOUND)
+    include(FetchContent)
+    set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(zlib
+        GIT_REPOSITORY https://github.com/madler/zlib.git
+        GIT_TAG v1.3.1
+        GIT_SHALLOW TRUE)
+    FetchContent_MakeAvailable(zlib)
+    if(TARGET zlibstatic)
+        add_library(ZLIB::ZLIB ALIAS zlibstatic)
+    elseif(TARGET zlib)
+        add_library(ZLIB::ZLIB ALIAS zlib)
+    else()
+        message(FATAL_ERROR "zlib was fetched but exposed no library target")
+    endif()
+    message(STATUS "zlib: using bundled v1.3.1")
+endif()
 
 qt_standard_project_setup(REQUIRES 6.5)
 

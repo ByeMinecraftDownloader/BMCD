@@ -42,7 +42,8 @@ Flatpak 需要 `flatpak-builder` 与 flathub remote；本机未安装故只做�
 ### 从源码构建
 
 依赖：CMake ≥ 3.21、Ninja、Qt ≥ 6.5（Core/Gui/Quick/Qml/Network/Concurrent/Sql/Test）、
-zlib；RAG 向量检索可选 onnxruntime。
+zlib（Linux/macOS 用系统包；Windows 没有系统 zlib 时 CMake 自动从源码拉取
+v1.3.1 并静态链接）；RAG 向量检索可选 onnxruntime。
 
 ```bash
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
