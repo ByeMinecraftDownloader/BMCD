@@ -19,7 +19,7 @@ APPDIR="$BUILD/AppDir"
 PLUGIN_ROOT="$BUILD/qt-plugins"
 ARCH=x86_64
 OUTPUT=${BMCD_OUTPUT:-"$BUILD/BMCD-$ARCH.AppImage"}
-QT_PLUGINS_SRC=${BMCD_QT_PLUGINS:-/usr/lib/qt6/plugins}
+QT_PLUGINS_SRC=${BMCD_QT_PLUGINS:-}
 
 LINUXDEPLOY="$TOOLS/linuxdeploy-$ARCH.AppImage"
 QT_PLUGIN="$TOOLS/linuxdeploy-plugin-qt-$ARCH.AppImage"
@@ -33,6 +33,15 @@ for tool in "$LINUXDEPLOY" "$QT_PLUGIN" "$APPIMAGETOOL"; do
 done
 
 QT_QMAKE=${QT_QMAKE:-$(command -v qmake6 || command -v qmake)}
+
+# Distro Qt lives in /usr/lib/qt6, but CI installs Qt elsewhere; ask qmake.
+if [[ -z $QT_PLUGINS_SRC ]]; then
+    QT_PLUGINS_SRC=$("$QT_QMAKE" -query QT_INSTALL_PLUGINS 2>/dev/null || true)
+fi
+if [[ ! -d $QT_PLUGINS_SRC ]]; then
+    QT_PLUGINS_SRC=/usr/lib/qt6/plugins
+fi
+[[ -d $QT_PLUGINS_SRC ]] || { echo "Qt plugin directory not found: $QT_PLUGINS_SRC" >&2; exit 1; }
 
 if [[ -z ${BMCD_SKIP_BUILD:-} ]]; then
     cmake -S "$ROOT" -B "$BUILD" -G Ninja -DCMAKE_BUILD_TYPE=Release
