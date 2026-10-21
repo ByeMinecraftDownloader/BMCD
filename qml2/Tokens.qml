@@ -1,28 +1,28 @@
 pragma Singleton
 import QtQuick
-import BMCD
+import BMCD as Bmcd
 
 // Semantic layer over Palette: views ask for "background" or "dangerSurface",
 // never for a raw colour. Spacing and radii live here too so the four views
 // share one grid.
 QtObject {
-    readonly property color background: Palette.background
-    readonly property color surface: Palette.surface
-    readonly property color surfaceAlt: Palette.surfaceAlt
-    readonly property color surfaceHigh: Palette.surfaceContainerHigh
-    readonly property color surfaceContainer: Palette.surfaceContainer
-    readonly property color text: Palette.onSurface
-    readonly property color textMuted: Palette.onSurfaceMuted
-    readonly property color textVariant: Palette.onSurfaceVariant
-    readonly property color primary: Palette.primary
-    readonly property color onPrimary: Palette.onPrimary
-    readonly property color primaryContainer: Palette.primaryContainer
-    readonly property color onPrimaryContainer: Palette.onPrimaryContainer
-    readonly property color outline: Palette.outline
-    readonly property color danger: Palette.error
-    readonly property color warning: Palette.warning
-    readonly property color success: Palette.success
-    readonly property color link: Palette.link
+    readonly property color background: Bmcd.Palette.background
+    readonly property color surface: Bmcd.Palette.surface
+    readonly property color surfaceAlt: Bmcd.Palette.surfaceAlt
+    readonly property color surfaceHigh: Bmcd.Palette.surfaceContainerHigh
+    readonly property color surfaceContainer: Bmcd.Palette.surfaceContainer
+    readonly property color text: Bmcd.Palette.onSurface
+    readonly property color textMuted: Bmcd.Palette.onSurfaceMuted
+    readonly property color textVariant: Bmcd.Palette.onSurfaceVariant
+    readonly property color primary: Bmcd.Palette.primary
+    readonly property color onPrimary: Bmcd.Palette.onPrimary
+    readonly property color primaryContainer: Bmcd.Palette.primaryContainer
+    readonly property color onPrimaryContainer: Bmcd.Palette.onPrimaryContainer
+    readonly property color outline: Bmcd.Palette.outline
+    readonly property color danger: Bmcd.Palette.error
+    readonly property color warning: Bmcd.Palette.warning
+    readonly property color success: Bmcd.Palette.success
+    readonly property color link: Bmcd.Palette.link
 
     readonly property int spacingXs: 4
     readonly property int spacingSm: 8

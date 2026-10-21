@@ -86,9 +86,13 @@ QString VersionService::urlFor(const QString &versionId) const
 void VersionService::startRequest()
 {
     if (m_reply) {
-        m_reply->abort();
-        m_reply->deleteLater();
+        // abort() emits finished() synchronously, and the finished handler
+        // clears m_reply; keep our own pointer so the deleteLater() below can
+        // never run on a null/dangling reply.
+        QNetworkReply *previous = m_reply;
         m_reply = nullptr;
+        previous->abort();
+        previous->deleteLater();
     }
 
     QNetworkRequest request{QUrl(QString::fromLatin1(kManifestUrl))};

@@ -1,5 +1,5 @@
 import QtQuick
-import BMCD
+import BMCD as Bmcd
 import BMCD.UI
 
 Item {
@@ -28,8 +28,8 @@ Item {
                         { label: qsTr("游戏目录"), value: VersionDetail.targetDir },
                         { label: qsTr("版本"), value: Qt.application.version },
                         { label: qsTr("语言"), value: uiLanguage },
-                        { label: qsTr("主题来源"), value: qsTr("%1（%2）").arg(Palette.tokenMode).arg(Palette.schemeName) },
-                        { label: qsTr("减少动效"), value: Palette.reduceMotion ? qsTr("跟随系统：开") : qsTr("跟随系统：关") }
+                        { label: qsTr("主题来源"), value: qsTr("%1（%2）").arg(Bmcd.Palette.tokenMode).arg(Bmcd.Palette.schemeName) },
+                        { label: qsTr("减少动效"), value: Bmcd.Palette.reduceMotion ? qsTr("跟随系统：开") : qsTr("跟随系统：关") }
                     ]
                     delegate: Row {
                         spacing: Tokens.spacingMd
