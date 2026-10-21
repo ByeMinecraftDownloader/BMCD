@@ -22,35 +22,50 @@ Item {
         anchors.fill: parent
         spacing: Tokens.spacingLg
 
-        Text {
-            text: qsTr("队列")
-            color: Tokens.text
-            font.pixelSize: Tokens.fontSizeHeading
-            font.weight: Font.DemiBold
+        PageHeader {
+            width: parent.width
+            title: qsTr("队列")
+            subtitle: qsTr("下载、校验与重试都在这里。")
         }
 
         Panel {
             width: parent.width
-            height: 96
+            height: Math.max(160, parent.height - y)
             visible: !view.hasPlan && !view.running
-            Text {
+
+            Column {
                 anchors.centerIn: parent
-                text: qsTr("锅里还是空的：去「版本」里挑一个锅底。")
-                color: Tokens.textMuted
+                spacing: Tokens.spacingSm
+                Icon {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    name: "queue"
+                    size: 22
+                    color: Tokens.textMuted
+                }
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: qsTr("锅里还是空的：去「版本」里挑一个锅底。")
+                    color: Tokens.textMuted
+                    font.pixelSize: Tokens.fontSizeBody
+                }
             }
         }
 
         Panel {
             width: parent.width
-            height: 132
+            height: Math.max(120, planRow.implicitHeight + padding * 2)
             visible: view.hasPlan || view.running || view.finished
 
             Row {
+                id: planRow
                 anchors.left: parent.left
+                anchors.right: planActions.left
+                anchors.rightMargin: Tokens.spacingLg
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: Tokens.spacingLg
 
                 CircleProgress {
+                    id: planProgress
                     width: 56
                     height: 56
                     value: view.progress
@@ -59,14 +74,20 @@ Item {
                 }
 
                 Column {
+                    width: planRow.width - planProgress.width - planRow.spacing
                     spacing: 4
+                    SectionLabel { text: qsTr("当前版本") }
                     Text {
+                        width: parent.width
                         text: VersionDetail.versionId
                         color: Tokens.text
                         font.pixelSize: Tokens.fontSizeTitle
                         font.weight: Font.DemiBold
+                        elide: Text.ElideRight
                     }
                     Text {
+                        width: parent.width
+                        elide: Text.ElideRight
                         text: view.running
                               ? qsTr("%1 / %2 文件 · %3 / %4 MB · %5 MB/s")
                                     .arg(VersionDetail.doneFiles).arg(VersionDetail.downloadTotalFiles)
@@ -83,12 +104,13 @@ Item {
                         color: Tokens.danger
                         font.pixelSize: Tokens.fontSizeCaption
                         elide: Text.ElideRight
-                        width: Math.max(160, view.width - 220)
+                        width: parent.width
                     }
                 }
             }
 
             Row {
+                id: planActions
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: Tokens.spacingSm
@@ -96,23 +118,27 @@ Item {
                 AppButton {
                     visible: view.downloadState === "running"
                     text: qsTr("暂停")
+                    iconName: "pause"
                     onClicked: VersionDetail.pauseDownload()
                 }
                 AppButton {
                     visible: view.downloadState === "paused"
                     text: qsTr("继续")
+                    iconName: "play"
                     primary: true
                     onClicked: VersionDetail.startDownload()
                 }
                 AppButton {
                     visible: view.running
                     text: qsTr("取消")
+                    iconName: "close"
                     danger: true
                     onClicked: VersionDetail.cancelDownload()
                 }
                 AppButton {
                     visible: !view.running
                     text: view.finished ? qsTr("重新校验") : qsTr("开始")
+                    iconName: view.finished ? "refresh" : "download"
                     primary: true
                     enabledByParent: view.hasPlan
                     onClicked: VersionDetail.startDownload()

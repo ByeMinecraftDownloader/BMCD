@@ -5,6 +5,7 @@ Rectangle {
     id: button
 
     property string text: ""
+    property string iconName: ""
     property bool primary: false
     property bool danger: false
     property bool enabledByParent: true
@@ -12,8 +13,8 @@ Rectangle {
     property int verticalPadding: Tokens.spacingSm
     signal clicked()
 
-    implicitWidth: label.implicitWidth + horizontalPadding * 2
-    implicitHeight: label.implicitHeight + verticalPadding * 2
+    implicitWidth: content.implicitWidth + horizontalPadding * 2
+    implicitHeight: Math.max(34, content.implicitHeight + verticalPadding * 2)
     radius: Tokens.radiusSm
     opacity: enabledByParent ? 1 : 0.45
     color: danger ? (mouse.pressed ? Qt.darker(Tokens.danger, 1.15) : Tokens.danger)
@@ -26,13 +27,29 @@ Rectangle {
     scale: mouse.pressed ? 0.98 : 1.0
     Behavior on scale { NumberAnimation { duration: Motion.micro; easing.type: Motion.outCubic } }
 
-    Text {
-        id: label
+    Accessible.role: Accessible.Button
+    Accessible.name: button.text
+
+    Row {
+        id: content
         anchors.centerIn: parent
-        text: button.text
-        color: button.primary ? Tokens.onPrimary : Tokens.text
-        font.pixelSize: Tokens.fontSizeBody
-        font.weight: button.primary ? Font.DemiBold : Font.Normal
+        spacing: 6
+
+        Icon {
+            visible: button.iconName !== ""
+            name: button.iconName
+            size: 15
+            color: button.danger ? Tokens.background
+                 : button.primary ? Tokens.primaryInk : Tokens.text
+        }
+        Text {
+            id: label
+            text: button.text
+            color: button.danger ? Tokens.background
+                 : button.primary ? Tokens.primaryInk : Tokens.text
+            font.pixelSize: Tokens.fontSizeBody
+            font.weight: button.primary ? Font.DemiBold : Font.Normal
+        }
     }
 
     HoverHandler { id: hover }

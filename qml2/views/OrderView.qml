@@ -4,11 +4,11 @@ import BMCD
 import BMCD.UI
 
 // "点菜": pick the pot (version), then the ingredients (mods, 0.7).
-// Five explicit states live in `state`: empty | loading | partial | error | success.
+// Five explicit states live in `phase`: empty | loading | partial | error | success.
 Item {
     id: view
 
-    property int state: {
+    readonly property int phase: {
         if (VersionService.loading)
             return 1;                       // loading
         if (String(VersionService.error || "").length > 0)
@@ -19,11 +19,10 @@ Item {
     }
     readonly property var stateNames: [qsTr("空"), qsTr("读取中"), qsTr("部分"), qsTr("出错"), qsTr("就绪")]
 
+    readonly property int listWidth: Math.min(460, Math.max(300, width * 0.38))
     readonly property int selectedIndex: versionList.currentIndex
-    readonly property string selectedId: {
-        const item = versionList.itemAtIndex(versionList.currentIndex);
-        return item && item.model ? item.model.id : "";
-    }
+    readonly property string selectedId: versionList.currentItem
+                                         ? versionList.currentItem.versionId : ""
 
     signal openServe()
 
@@ -43,46 +42,54 @@ Item {
                      : []
     }
 
-    Row {
+    Column {
         anchors.fill: parent
         spacing: Tokens.spacingLg
 
+        PageHeader {
+            width: parent.width
+            title: qsTr("版本")
+            subtitle: qsTr("挑一个锅底；读取清单后就能下锅。")
+        }
+
+        Row {
+            width: parent.width
+            height: parent.height - y
+            spacing: Tokens.spacingLg
+
         // ── version list ────────────────────────────────────────────────
         Column {
-            width: Math.max(300, view.width * 0.38)
+            width: view.listWidth
             height: parent.height
             spacing: Tokens.spacingMd
 
-            Row {
-                spacing: Tokens.spacingSm
+            SearchField {
+                id: search
                 width: parent.width
-                SearchField {
-                    id: search
-                    width: parent.width - channelRow.width - Tokens.spacingSm
-                    label: qsTr("搜索版本（/ 聚焦）")
-                    onTextChanged: {
-                        filtered.searchText = text;
-                        if (text.length >= 2)
-                            ragTimer.restart();
-                        else {
-                            ragTimer.stop();
-                            view.suggestions = [];
-                        }
+                label: qsTr("搜索版本（/ 聚焦）")
+                onTextChanged: {
+                    filtered.searchText = text;
+                    if (text.length >= 2)
+                        ragTimer.restart();
+                    else {
+                        ragTimer.stop();
+                        view.suggestions = [];
                     }
                 }
-                Row {
-                    id: channelRow
-                    spacing: 2
-                    Repeater {
-                        model: [{ key: "release", label: qsTr("正式") },
-                                { key: "snapshot", label: qsTr("快照") },
-                                { key: "all", label: qsTr("全部") }]
-                        delegate: AppButton {
-                            text: modelData.label
-                            primary: filtered.channel === modelData.key
-                            horizontalPadding: Tokens.spacingMd
-                            onClicked: filtered.channel = modelData.key
-                        }
+            }
+
+            Row {
+                id: channelRow
+                spacing: 2
+                Repeater {
+                    model: [{ key: "release", label: qsTr("正式") },
+                            { key: "snapshot", label: qsTr("快照") },
+                            { key: "all", label: qsTr("全部") }]
+                    delegate: AppButton {
+                        text: modelData.label
+                        primary: filtered.channel === modelData.key
+                        horizontalPadding: Tokens.spacingMd
+                        onClicked: filtered.channel = modelData.key
                     }
                 }
             }
@@ -105,7 +112,7 @@ Item {
 
             Text {
                 width: parent.width
-                text: qsTr("%1 · %2 个版本").arg(view.stateNames[view.state]).arg(filtered.count)
+                text: qsTr("%1 · %2 个版本").arg(view.stateNames[view.phase]).arg(filtered.count)
                 color: Tokens.textMuted
                 font.pixelSize: Tokens.fontSizeCaption
             }
@@ -141,7 +148,10 @@ Item {
                             font.weight: ListView.isCurrentItem ? Font.DemiBold : Font.Normal
                         }
                         Text {
-                            text: row.type + (row.releaseTime ? " · " + Qt.formatDate(row.releaseTime, "yyyy-MM-dd") : "")
+                            text: (model.type === "release" ? qsTr("正式")
+                                                : model.type === "snapshot" ? qsTr("快照")
+                                                                            : model.type)
+                              + (model.releaseTime ? " · " + Qt.formatDate(model.releaseTime, "yyyy-MM-dd") : "")
                                   + (InstalledVersions.contains(row.versionId) ? qsTr(" · 已安装") : "")
                             color: Tokens.textMuted
                             font.pixelSize: Tokens.fontSizeCaption
@@ -172,20 +182,24 @@ Item {
 
         // ── detail / list panel ─────────────────────────────────────────
         Panel {
-            width: parent.width - (Math.max(300, view.width * 0.38) + Tokens.spacingLg)
+            width: parent.width - (view.listWidth + Tokens.spacingLg)
             height: parent.height
             padding: Tokens.spacingXl
 
             Column {
                 width: parent.width
                 spacing: Tokens.spacingLg
-                visible: view.state === 4
+                visible: view.phase === 4
+
+                SectionLabel { text: qsTr("版本详情") }
 
                 Text {
+                    width: parent.width
                     text: view.selectedId
                     color: Tokens.text
                     font.pixelSize: Tokens.fontSizeDisplay
                     font.weight: Font.DemiBold
+                    elide: Text.ElideRight
                 }
                 Text {
                     width: parent.width
@@ -224,29 +238,6 @@ Item {
                     }
                 }
 
-                Row {
-                    spacing: Tokens.spacingMd
-                    AppButton {
-                        text: VersionDetail.versionId === view.selectedId
-                              && VersionDetail.state === "ready" ? qsTr("重新读取") : qsTr("读取清单")
-                        onClicked: VersionDetail.select(view.selectedId, VersionService.urlFor(view.selectedId))
-                    }
-                    AppButton {
-                        text: qsTr("下载（烹饪）")
-                        primary: true
-                        enabledByParent: VersionDetail.versionId === view.selectedId
-                                         && VersionDetail.state === "ready"
-                                         && VersionDetail.downloadState !== "running"
-                        onClicked: VersionDetail.startDownload()
-                    }
-                    AppButton {
-                        text: qsTr("去导出")
-                        enabledByParent: VersionDetail.versionId === view.selectedId
-                                         && VersionDetail.state === "ready"
-                        onClicked: view.openServe()
-                    }
-                }
-
                 Text {
                     width: parent.width
                     visible: VersionDetail.error.length > 0 && VersionDetail.versionId === view.selectedId
@@ -257,17 +248,65 @@ Item {
                 }
             }
 
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: detailActions.top
+                anchors.bottomMargin: Tokens.spacingLg
+                height: 1
+                color: Tokens.outline
+                visible: view.phase === 4
+            }
+
+            Flow {
+                id: detailActions
+                width: parent.width
+                anchors.left: parent.left
+                anchors.bottom: parent.bottom
+                spacing: Tokens.spacingMd
+                visible: view.phase === 4
+
+                AppButton {
+                    text: VersionDetail.versionId === view.selectedId
+                          && VersionDetail.state === "ready" ? qsTr("重新读取") : qsTr("读取清单")
+                    onClicked: VersionDetail.select(view.selectedId, VersionService.urlFor(view.selectedId))
+                }
+                AppButton {
+                    text: qsTr("下载（烹饪）")
+                    iconName: "download"
+                    primary: true
+                    enabledByParent: VersionDetail.versionId === view.selectedId
+                                     && VersionDetail.state === "ready"
+                                     && VersionDetail.downloadState !== "running"
+                    onClicked: VersionDetail.startDownload()
+                }
+                AppButton {
+                    text: qsTr("去导出")
+                    iconName: "serve"
+                    enabledByParent: VersionDetail.versionId === view.selectedId
+                                     && VersionDetail.state === "ready"
+                    onClicked: view.openServe()
+                }
+            }
+
             // loading / error / empty share one centred message block
             Column {
                 anchors.centerIn: parent
                 spacing: Tokens.spacingMd
-                visible: view.state !== 4
+                visible: view.phase !== 4
+                Icon {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    visible: view.phase !== 1
+                    name: view.phase === 3 ? "warning" : "search"
+                    size: 22
+                    color: view.phase === 3 ? Tokens.danger : Tokens.textMuted
+                }
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: view.state === 1 ? qsTr("正在读取版本清单…")
-                        : view.state === 3 ? VersionService.error
+                    text: view.phase === 1 ? qsTr("正在读取版本清单…")
+                        : view.phase === 3 ? VersionService.error
                         : qsTr("没有匹配的版本")
-                    color: view.state === 3 ? Tokens.danger : Tokens.textMuted
+                    color: view.phase === 3 ? Tokens.danger : Tokens.textMuted
                     font.pixelSize: Tokens.fontSizeBody
                     wrapMode: Text.WordWrap
                     width: Math.min(view.width * 0.5, 420)
@@ -276,10 +315,12 @@ Item {
                 AppButton {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: qsTr("刷新清单")
-                    visible: view.state === 3 || view.state === 0
+                    iconName: "refresh"
+                    visible: view.phase === 3 || view.phase === 0
                     onClicked: VersionService.refresh()
                 }
             }
+        }
         }
     }
 

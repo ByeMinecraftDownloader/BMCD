@@ -13,6 +13,7 @@ class VersionFilterModel : public QSortFilterProxyModel
 
     Q_PROPERTY(QString searchText READ searchText WRITE setSearchText NOTIFY searchTextChanged)
     Q_PROPERTY(QString channel READ channel WRITE setChannel NOTIFY channelChanged)
+    Q_PROPERTY(int count READ count NOTIFY countChanged)
 
 public:
     explicit VersionFilterModel(QObject *parent = nullptr);
@@ -23,9 +24,12 @@ public:
     QString channel() const { return m_channel; }
     void setChannel(const QString &channel);
 
+    int count() const { return rowCount(); }
+
 signals:
     void searchTextChanged();
     void channelChanged();
+    void countChanged();
 
 protected:
     bool filterAcceptsRow(int sourceRow, const QModelIndex &sourceParent) const override;

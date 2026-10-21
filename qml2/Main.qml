@@ -5,8 +5,8 @@ import BMCD.UI
 Window {
     id: root
 
-    width: 1120
-    height: 760
+    width: initialWidth
+    height: initialHeight
     minimumWidth: 880
     minimumHeight: 600
     visible: true
@@ -43,12 +43,19 @@ Window {
             }
 
             Item {
+                id: contentHost
                 width: parent.width - rail.width
                 height: parent.height
+                readonly property int gutter: width < 1000 ? 12 : 16
+
+                Item {
+                    id: page
+                    anchors.centerIn: parent
+                    width: Math.min(parent.width - contentHost.gutter * 2, 1280)
+                    height: parent.height - contentHost.gutter * 2
 
                 Loader {
                     anchors.fill: parent
-                    anchors.margins: Tokens.spacingLg
                     active: root.section === 0
                     source: "views/OrderView.qml"
                     onLoaded: item.openServe.connect(function() {
@@ -62,21 +69,19 @@ Window {
                 }
                 Loader {
                     anchors.fill: parent
-                    anchors.margins: Tokens.spacingLg
                     active: root.section === 1
                     source: "views/CookView.qml"
                 }
                 Loader {
                     anchors.fill: parent
-                    anchors.margins: Tokens.spacingLg
                     active: root.section === 2
                     source: "views/ServeView.qml"
                 }
                 Loader {
                     anchors.fill: parent
-                    anchors.margins: Tokens.spacingLg
                     active: root.section === 3
                     source: "views/SettingsView.qml"
+                }
                 }
             }
         }
@@ -100,6 +105,8 @@ Window {
             Behavior on width { NumberAnimation { duration: Motion.standard } }
         }
     }
+
+    WindowResizeHandles { }
 
     ToastBar {
         id: toast

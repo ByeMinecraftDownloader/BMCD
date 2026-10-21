@@ -15,9 +15,11 @@ QtObject {
     readonly property color textMuted: Bmcd.Palette.onSurfaceMuted
     readonly property color textVariant: Bmcd.Palette.onSurfaceVariant
     readonly property color primary: Bmcd.Palette.primary
-    readonly property color onPrimary: Bmcd.Palette.onPrimary
+    // QML reserves names starting with "on" for signal handlers, so expose the
+    // two "ink on primary" colours under plain names.
+    readonly property color primaryInk: Bmcd.Palette.onPrimary
     readonly property color primaryContainer: Bmcd.Palette.primaryContainer
-    readonly property color onPrimaryContainer: Bmcd.Palette.onPrimaryContainer
+    readonly property color primaryContainerInk: Bmcd.Palette.onPrimaryContainer
     readonly property color outline: Bmcd.Palette.outline
     readonly property color danger: Bmcd.Palette.error
     readonly property color warning: Bmcd.Palette.warning

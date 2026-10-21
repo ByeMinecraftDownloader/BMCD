@@ -15,6 +15,7 @@
 #include <QNetworkReply>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QQuickItem>
 #include <QQuickWindow>
 #include <QStorageInfo>
 #include <QCryptographicHash>
@@ -39,6 +40,7 @@
 #include "platform/Paths.h"
 #include "platform/PlatformInfo.h"
 #include "theme/ThemeSource.h"
+#include "theme/IconImageProvider.h"
 #include "theme/TokenBuilder.h"
 #include "InstalledVersions.h"
 #include "Instances.h"
@@ -535,6 +537,29 @@ int runFetchModel()
     return 0;
 }
 
+void dumpItemTree(QQuickItem *item, int depth, QTextStream &out)
+{
+    if (!item || !item->isVisible())
+        return;
+    const QString cls = QString::fromLatin1(item->metaObject()->className());
+    const QString text = item->property("text").toString();
+    const QPointF origin = item->mapToScene(QPointF(0, 0));
+    out << QString(depth * 2, ' ') << cls;
+    if (!text.isEmpty())
+        out << " \"" << text.left(40).replace('\n', ' ') << "\"";
+    out << " @(" << qRound(origin.x()) << "," << qRound(origin.y()) << ") "
+        << qRound(item->width()) << "x" << qRound(item->height());
+    const QVariant font = item->property("font");
+    if (!text.isEmpty() && font.isValid()) {
+        const QFont f = font.value<QFont>();
+        out << " font=" << f.pixelSize() << "/" << f.weight();
+    }
+    out << "\n";
+    const auto children = item->childItems();
+    for (QQuickItem *child : children)
+        dumpItemTree(child, depth + 1, out);
+}
+
 int runI18nCheck()
 {
     QTranslator translator;
@@ -551,11 +576,12 @@ int runI18nCheck()
     };
     static const Probe probes[] = {
         {"NavRail", "版本", "Versions"},
-        {"NavRail", "导出", "Serve"},
-        {"OrderView", "刷新清单", "Refresh"},
-        {"ServeView", "出菜到文件夹", "Serve to folder"},
-        {"SettingsView", "游戏目录", "Game directory"},
-        {"CookView", "等待开始", "Waiting"},
+        {"OrderView", "版本", "Versions"},
+        {"OrderView", "挑一个锅底；读取清单后就能下锅。",
+         "Pick a base version, load its manifest, then start cooking."},
+        {"ServeView", "两个出口", "Two exits"},
+        {"WindowChrome", "关闭", "Close"},
+        {"CookView", "当前版本", "Current version"},
     };
     int failures = 0;
     for (const Probe &probe : probes) {
@@ -646,6 +672,9 @@ void addOptions(QCommandLineParser &parser)
     parser.addOption({QStringLiteral("benchmark"), QStringLiteral("Print startup/first-frame/memory numbers and exit.")});
     parser.addOption({QStringLiteral("view"), QStringLiteral("Open on a view: order|cook|serve|settings."),
                       QStringLiteral("name"), QStringLiteral("order")});
+    parser.addOption({QStringLiteral("size"), QStringLiteral("Window size, e.g. 880x600."),
+                      QStringLiteral("WxH")});
+    parser.addOption({QStringLiteral("dump-layout"), QStringLiteral("Print the QML item tree and exit.")});
     parser.addOption({QStringLiteral("lang"), QStringLiteral("UI language code, e.g. en or zh_CN."),
                       QStringLiteral("code")});
     parser.addOption({QStringLiteral("ui"), QStringLiteral("UI generation: v2 (new) or v1 (frozen)."),
@@ -1021,6 +1050,7 @@ int main(int argc, char *argv[])
 
     // ── UI ──────────────────────────────────────────────────────────────
     QQmlApplicationEngine engine;
+    engine.addImageProvider(QStringLiteral("bmcdicon"), new IconImageProvider);
 
     // Deep link / screenshot support: preselect a version when the window opens.
     engine.rootContext()->setContextProperty(QStringLiteral("initialVersion"),
@@ -1029,6 +1059,13 @@ int main(int argc, char *argv[])
                                                      : QString());
     engine.rootContext()->setContextProperty(QStringLiteral("autoStartDownload"),
                                              qEnvironmentVariableIsSet("MC_AUTOSTART"));
+    QSize initialSize(1120, 760);
+    const QStringList sizeParts = parser.value(QStringLiteral("size")).split(QLatin1Char('x'));
+    if (sizeParts.size() == 2 && sizeParts.at(0).toInt() > 0 && sizeParts.at(1).toInt() > 0)
+        initialSize = QSize(sizeParts.at(0).toInt(), sizeParts.at(1).toInt());
+    engine.rootContext()->setContextProperty(QStringLiteral("initialWidth"), initialSize.width());
+    engine.rootContext()->setContextProperty(QStringLiteral("initialHeight"), initialSize.height());
+
     const QString view = parser.value(QStringLiteral("view"));
     int initialSection = view == QLatin1String("cook") ? 1
                        : view == QLatin1String("serve") ? 2
@@ -1066,6 +1103,24 @@ int main(int argc, char *argv[])
                         out() << "benchmark: first-frame " << startupTimer.elapsed()
                               << " ms, window-created " << createdMs << " ms, rss "
                               << (rssKb / 1024) << " MB" << Qt::endl;
+                        app.quit();
+                    });
+                },
+                Qt::QueuedConnection);
+    }
+
+    if (parser.isSet(QStringLiteral("dump-layout"))) {
+        QObject::connect(
+                &engine,
+                &QQmlApplicationEngine::objectCreated,
+                &app,
+                [&app](QObject *object, const QUrl &) {
+                    auto *window = qobject_cast<QQuickWindow *>(object);
+                    if (!window)
+                        return;
+                    QTimer::singleShot(800, window, [window, &app] {
+                        QTextStream out(stdout);
+                        dumpItemTree(window->contentItem(), 0, out);
                         app.quit();
                     });
                 },

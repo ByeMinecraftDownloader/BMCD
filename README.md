@@ -4,8 +4,11 @@
 从官方版本清单下载游戏文件，也能导入、校验、部署和导出 `.mrpack` / CurseForge / FTB 整合包。
 界面按「点菜 → 烹饪 → 上菜 → 设置」四步组织，配色跟随桌面 matugen 色板。
 
-![点菜页](docs/preview-order.png)
-![上菜页](docs/preview-serve.png)
+| 点菜 | 烹饪 |
+|---|---|
+| ![点菜页](docs/preview-order.png) | ![烹饪页](docs/preview-cook.png) |
+| **上菜** | **设置** |
+| ![上菜页](docs/preview-serve.png) | ![设置页](docs/preview-settings.png) |
 
 ## 1.0 能做什么
 
@@ -41,7 +44,7 @@ Flatpak 需要 `flatpak-builder` 与 flathub remote；本机未安装故只做�
 
 ### 从源码构建
 
-依赖：CMake ≥ 3.21、Ninja、Qt ≥ 6.5（Core/Gui/Quick/Qml/Network/Concurrent/Sql/Test）、
+依赖：CMake ≥ 3.21、Ninja、Qt ≥ 6.5（Core/Gui/Quick/Qml/Network/Concurrent/Sql/Svg/Test）、
 zlib（Linux/macOS 用系统包；Windows 没有系统 zlib 时 CMake 自动从源码拉取
 v1.3.1 并静态链接）；RAG 向量检索可选 onnxruntime。
 

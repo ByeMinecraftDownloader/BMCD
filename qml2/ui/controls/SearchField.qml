@@ -47,7 +47,7 @@ Rectangle {
         verticalAlignment: TextInput.AlignVCenter
         color: Tokens.text
         selectionColor: Tokens.primary
-        selectedTextColor: Tokens.onPrimary
+        selectedTextColor: Tokens.primaryInk
         font.pixelSize: Tokens.fontSizeBody
         onAccepted: field.accepted()
     }

@@ -16,6 +16,7 @@ class PackController : public QObject
 {
     Q_OBJECT
     QML_ELEMENT
+    QML_SINGLETON
 
     Q_PROPERTY(QString state READ state NOTIFY stateChanged)          // idle|loading|ready|working|done|error
     Q_PROPERTY(QString error READ error NOTIFY stateChanged)

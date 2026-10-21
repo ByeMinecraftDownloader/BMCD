@@ -1,8 +1,8 @@
 import QtQuick
 import BMCD.UI
 
-// Frameless window chrome: drag, double-click maximise, min/max/close and the
-// eight resize edges. The rest of the UI never touches window internals.
+// Frameless window chrome: drag, double-click maximise, min/max/close. Resize
+// grips live in WindowResizeHandles at the window root.
 Item {
     id: chrome
 
@@ -28,16 +28,17 @@ Item {
         spacing: Tokens.spacingSm
 
         Text {
+            id: appTitle
             text: chrome.title
             color: Tokens.text
-            font.pixelSize: Tokens.fontSizeBody
+            font.pixelSize: 13
             font.weight: Font.DemiBold
         }
         Text {
             text: chrome.subtitle
             color: Tokens.textMuted
-            font.pixelSize: Tokens.fontSizeCaption
-            anchors.verticalCenter: parent.verticalCenter
+            font.pixelSize: 11
+            anchors.baseline: appTitle.baseline
         }
     }
 
@@ -49,9 +50,9 @@ Item {
 
         Repeater {
             model: [
-                { label: "—", action: "min" },
-                { label: "▢", action: "max" },
-                { label: "✕", action: "close" }
+                { icon: "minimize", action: "min", tip: qsTr("最小化") },
+                { icon: "maximize", action: "max", tip: qsTr("最大化") },
+                { icon: "close", action: "close", tip: qsTr("关闭") }
             ]
             delegate: Item {
                 width: 46
@@ -61,13 +62,15 @@ Item {
                     color: ma.hovered ? (modelData.action === "close" ? Tokens.danger : Tokens.surfaceHigh) : "transparent"
                     Behavior on color { ColorAnimation { duration: Motion.micro } }
                 }
-                Text {
+                Icon {
                     anchors.centerIn: parent
-                    text: modelData.label
-                    color: Tokens.textMuted
-                    font.pixelSize: 13
+                    name: modelData.icon
+                    size: 12
+                    color: ma.hovered && modelData.action === "close" ? Tokens.background : Tokens.textMuted
                 }
                 HoverHandler { id: ma }
+                Accessible.role: Accessible.Button
+                Accessible.name: modelData.tip
                 TapHandler {
                     onTapped: {
                         if (modelData.action === "min")
@@ -84,34 +87,4 @@ Item {
         }
     }
 
-    // Resize edges. 6 px wide, hidden when maximised.
-    Repeater {
-        model: ["left", "right", "top", "bottom", "topleft", "topright", "bottomleft", "bottomright"]
-        delegate: MouseArea {
-            readonly property var edges: ({
-                left: Qt.LeftEdge, right: Qt.RightEdge, top: Qt.TopEdge, bottom: Qt.BottomEdge
-            })
-            readonly property bool isCorner: modelData.length > 6
-            readonly property var pair: isCorner
-                ? [modelData.indexOf("left") >= 0 ? Qt.LeftEdge : Qt.RightEdge,
-                   modelData.indexOf("top") >= 0 ? Qt.TopEdge : Qt.BottomEdge]
-                : [edges[modelData]]
-
-            visible: chrome.targetWindow.visibility !== Window.Maximized
-            z: 10
-            width: isCorner ? 16 : (modelData === "left" || modelData === "right" ? 6 : chrome.width)
-            height: isCorner ? 16 : (modelData === "top" || modelData === "bottom" ? 6 : chrome.height)
-            x: modelData.indexOf("left") >= 0 ? 0
-             : modelData.indexOf("right") >= 0 ? chrome.width - width
-             : 0
-            y: modelData.indexOf("top") >= 0 ? 0
-             : modelData.indexOf("bottom") >= 0 ? chrome.height - height
-             : 0
-            cursorShape: (modelData === "left" || modelData === "right") ? Qt.SizeHorCursor
-                       : (modelData === "top" || modelData === "bottom") ? Qt.SizeVerCursor
-                       : modelData === "topleft" || modelData === "bottomright" ? Qt.SizeFDiagCursor
-                       : Qt.SizeBDiagCursor
-            onPressed: chrome.targetWindow.startSystemResize(pair[0] | (pair[1] === undefined ? 0 : pair[1]))
-        }
-    }
 }

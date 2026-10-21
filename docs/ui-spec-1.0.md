@@ -1,10 +1,11 @@
-# BMCD 1.0 界面规格（0.6 实现版）
+# BMCD 1.0 界面规格（1.0 实现版）
 
 本文记录 **已经落地** 的界面与交互，不是愿望清单。凡标「冻结」的部分（`qml/` 目录下的
 v1 界面）在 1.0 已移除；`qml2/`（QML 模块 `BMCD.UI`）是唯一界面
 切换，默认 v2。
 
-- 视觉基准：`docs/preview-06.png`（1120×760，`QT_QPA_PLATFORM=offscreen` 实拍）
+- 视觉基准：`docs/preview-{order,cook,serve,settings}.png`（1120×760，
+  `QT_QPA_PLATFORM=offscreen` 实拍；`--target /tmp/BMCD-preview` 避免写入本机路径）
 - 色板来源与算法：`docs/roadmap-1.0.md` §2、`src/theme/TokenBuilder.cpp`
 - 动效常量唯一定义处：`qml2/Motion.qml`；语义色唯一定义处：`qml2/Tokens.qml`
 
@@ -17,8 +18,8 @@ v1 界面）在 1.0 已移除；`qml2/`（QML 模块 `BMCD.UI`）是唯一界面
 | 上菜 Serve | 出菜到文件夹 / 整合包 | `ServeView.qml` | `PackController` → `Deployer` / `Renderers` / `LicenseGate` |
 | 设置 Settings | 看路径、版本、色板模式、检索索引 | `SettingsView.qml` | `platform::Paths` / `Palette` / `RagController` |
 
-左侧 `NavRail` 四项一一对应，`Ctrl+1..4` 直接跳转。四个视图常驻（`Loader` + `visible`），
-不销毁，避免切页丢状态。
+左侧 `NavRail` 四项一一对应，`Ctrl+1..4` 直接跳转。四个视图由 `Loader.active` 切换，
+同一时刻只加载一个；页面状态放在 `VersionDetail` / `PackController` 等单例里，切页不丢。
 
 点菜页搜索框下方有一行**检索建议**（`RagController.suggest`，260 ms 防抖，最多 3 条，
 显示「相关：标题 — 片段」）。建议只做提示，不改变列表过滤；索引不存在时静默隐藏，
@@ -33,8 +34,8 @@ v1 界面）在 1.0 已移除；`qml2/`（QML 模块 `BMCD.UI`）是唯一界面
 | `background` | 窗口底色 | `#0E1415`（fallback）或 L\*7 |
 | `surface` / `surfaceAlt` / `surfaceHigh` | 卡片 / 输入框 / 悬浮层 | L\*7 / 11 / 15 |
 | `text` / `textMuted` / `textVariant` | 正文 / 次要 / 弱化 | L\*94 / 78（-alpha）/ 78 |
-| `primary` / `onPrimary` | 主按钮、进度 | L\*80，chroma 10–44（跟随源色相） |
-| `primaryContainer` / `onPrimaryContainer` | 选中态、徽标 | L\*32 / L\*90 |
+| `primary` / `primaryInk` | 主按钮、进度 / 主按钮文字 | L\*80，chroma 10–44（跟随源色相） |
+| `primaryContainer` / `primaryContainerInk` | 选中态、徽标 / 其上的文字 | L\*32 / L\*90 |
 | `outline` | 1 px 描边 | L\*56 |
 | `danger` / `warning` / `success` / `link` | 错误 / 警告 / 成功 / 链接 | 固定色相 25 / 80 / 148；对比度门禁 |
 
@@ -111,6 +112,10 @@ ready --exportPack(mrpack|ftb|self)--> working --> done(resultPath)
 - 不依赖颜色传达状态：错误有图标 + 文案，进度有百分比数字。
 - 动效可被输入打断；`reduceMotion` 时不做位移与弹簧。
 - 每屏最小 880×600；窗口 1120×760 时四个视图都无滚动条。
+- 内容区最大 1280 px 并居中（超宽窗口不把表格拉成一条线）；边距 880–1000 px 时 12 px，
+  更宽时 16 px。
+- 面板高度由内容决定；设置页在高度不足时整页滚动。空态占满剩余高度并居中。
+- 窗框八向可拖拽：四边 6 px、四角 16 px，最大化时禁用；标题栏双击切换最大化。
 
 ## 7. 离屏回归
 
@@ -122,13 +127,25 @@ QT_QPA_PLATFORM=offscreen MC_SCREENSHOT=/tmp/ui.png MC_SCREENSHOT_DELAY=7000 \
 ```
 
 判据：尺寸 1120×760、左上角背景 `(14,20,21)`、颜色数 > 1000、`MC_LOG` 中无
-`ReferenceError` / `TypeError` / `Unable to assign`。与 `docs/preview-06.png`
+`ReferenceError` / `TypeError` / `Unable to assign`。与 `docs/preview-order.png`
 做 RMSE（阈值 0.02）与 2% fuzz 下的差异像素数（阈值 5000 px）——动态文本会让差异
 非零，所以阈值放宽，但配色回归（整屏变色）必然超限。CI 里同等条件跑一次。
 
-## 8. 未做（明确记录）
+## 8. 1.0 界面重构（已落地）
+
+- 图标：`qml2/ui/Icon.qml` 走 `IconImageProvider`（SVG → 按 palette 着色），不再用
+  `▤ ≡ ↥ ⚙` 字体字形，避免不同字体的基线/宽度漂移；`--target` 截图和 golden 都可复现。
+- 层级：`PageHeader`（22 px 标题 + 13 px 说明）、`SectionLabel`（11 px DemiBold）、
+  `SettingRow`（92 px 标签 + 可省略值）统一四个视图；窗口按钮 12 px 图标，标题与副标题
+  按 baseline 对齐。
+- 响应：`OrderView` 左栏 `clamp(300, 38%, 460)`，搜索框占满、渠道按钮换行；详情操作栏
+  贴底；`CookView`/`ServeView` 面板内容自适应；`SettingsView` 可滚动。
+- QML 坑位：属性名以 `on` 开头会被当成信号处理器（`onPrimary` / `onPrimaryContainer`
+  解析为黑色），因此 token 暴露为 `primaryInk` / `primaryContainerInk`。
+
+## 9. 未做（明确记录）
 
 - 无最小化到托盘、无系统主题实时跟随（只在启动时读一次，`Palette.reload()` 可手动触发）。
-- 无高对比度模式、无屏幕阅读器语义（`Accessible.*` 未接）。
+- 无高对比度模式；导航、窗口按钮、主操作按钮已接 `Accessible.name/role`，其余控件未系统化。
 - 0.7 的模组列表、RAG 搜索框、「推荐」卡片只留了版位（`OrderView` 右栏 + `SettingsView`
   的 RAG 占位）。

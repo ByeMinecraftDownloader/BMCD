@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Quick Qml Network Concurrent Sql Test)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Quick Qml Network Concurrent Sql Svg Test)
 
 # Optional neural embeddings (0.7). Without onnxruntime the index still works
 # with the deterministic hashing embedder and FTS5.
@@ -65,8 +65,13 @@ qt_add_qml_module(bmcd_ui
         qml2/Main.qml
         qml2/Motion.qml
         qml2/Tokens.qml
+        qml2/ui/Icon.qml
         qml2/ui/NavRail.qml
+        qml2/ui/PageHeader.qml
+        qml2/ui/SectionLabel.qml
+        qml2/ui/SettingRow.qml
         qml2/ui/WindowChrome.qml
+        qml2/ui/WindowResizeHandles.qml
         qml2/ui/controls/AppButton.qml
         qml2/ui/controls/CircleProgress.qml
         qml2/ui/controls/ConfirmDialog.qml
@@ -101,6 +106,8 @@ qt_add_qml_module(bmcd
         src/theme/ColorMath.cpp
         src/theme/TokenBuilder.h
         src/theme/TokenBuilder.cpp
+        src/theme/IconImageProvider.h
+        src/theme/IconImageProvider.cpp
         src/theme/ThemeSource.h
         src/theme/ThemeSource.cpp
         src/platform/Paths.h
@@ -179,6 +186,7 @@ target_link_libraries(bmcd PRIVATE
     Qt6::Network
     Qt6::Concurrent
     Qt6::Sql
+    Qt6::Svg
     bmcd_ui
     ZLIB::ZLIB
 )

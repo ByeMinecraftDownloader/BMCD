@@ -8,7 +8,9 @@ import BMCD.UI
 Item {
     id: view
 
-    readonly property int state: {
+    // `state` is a built-in Item property; use a distinct name so unqualified
+    // bindings keep working inside this component.
+    readonly property int phase: {
         if (PackController.state === "error")
             return 3;
         if (PackController.state === "loading" || PackController.state === "working")
@@ -18,7 +20,7 @@ Item {
         return 4;
     }
 
-    readonly property bool ready: state === 4 && !PackController.busy
+    readonly property bool ready: phase === 4 && !PackController.busy
     readonly property bool selfBlocked: PackController.licenceDenied > 0
 
     FolderDialog {
@@ -40,36 +42,49 @@ Item {
         anchors.fill: parent
         spacing: Tokens.spacingLg
 
-        Row {
+        Item {
             width: parent.width
-            Text {
-                text: qsTr("导出")
-                color: Tokens.text
-                font.pixelSize: Tokens.fontSizeHeading
-                font.weight: Font.DemiBold
+            height: Math.max(header.implicitHeight, actions.height)
+
+            PageHeader {
+                id: header
+                width: parent.width - actions.width - Tokens.spacingLg
+                title: qsTr("导出")
+                subtitle: qsTr("先检查冲突与许可，再选出口。")
             }
-            Item { width: parent.width - 340; height: 1 }
-            AppButton {
-                text: qsTr("导入整合包…")
-                enabledByParent: !PackController.busy
-                onClicked: importDialog.open()
-            }
-            AppButton {
-                text: qsTr("重新准备")
-                visible: VersionDetail.state === "ready"
-                onClicked: PackController.prepare(VersionDetail.versionId,
-                                                  VersionService.urlFor(VersionDetail.versionId))
+
+            Row {
+                id: actions
+                anchors.right: parent.right
+                anchors.top: parent.top
+                spacing: Tokens.spacingSm
+                AppButton {
+                    text: qsTr("导入整合包…")
+                    iconName: "import"
+                    enabledByParent: !PackController.busy
+                    onClicked: importDialog.open()
+                }
+                AppButton {
+                    text: qsTr("重新准备")
+                    iconName: "refresh"
+                    visible: VersionDetail.state === "ready"
+                    onClicked: PackController.prepare(VersionDetail.versionId,
+                                                      VersionService.urlFor(VersionDetail.versionId))
+                }
             }
         }
 
         Panel {
             width: parent.width
-            height: 220
-            visible: state === 4
+            height: Math.max(200, packColumn.implicitHeight + padding * 2)
+            visible: phase === 4
 
             Column {
-                anchors.fill: parent
+                id: packColumn
+                width: parent.width
                 spacing: Tokens.spacingMd
+
+                SectionLabel { text: qsTr("当前内容") }
 
                 Row {
                     spacing: Tokens.spacingMd
@@ -123,21 +138,26 @@ Item {
                     font.pixelSize: Tokens.fontSizeCaption
                 }
 
+                SectionLabel { text: qsTr("两个出口") }
+
                 Row {
                     spacing: Tokens.spacingMd
                     AppButton {
                         text: qsTr("出菜到文件夹")
+                        iconName: "folder"
                         primary: true
                         enabledByParent: view.ready
                         onClicked: PackController.serve()
                     }
                     AppButton {
                         text: qsTr("出菜到整合包（.mrpack）")
+                        iconName: "export"
                         enabledByParent: view.ready
                         onClicked: PackController.exportPack("mrpack")
                     }
                     AppButton {
                         text: qsTr("自包含包")
+                        iconName: "export"
                         enabledByParent: view.ready && !view.selfBlocked
                         onClicked: selfConfirm.open()
                     }
@@ -153,6 +173,7 @@ Item {
                     }
                     AppButton {
                         text: qsTr("已获授权，继续")
+                        iconName: "check"
                         onClicked: PackController.confirm(PackController.deniedFiles[0])
                     }
                 }
@@ -161,10 +182,12 @@ Item {
 
         Panel {
             width: parent.width
-            height: 120
-            visible: state === 0
+            height: Math.max(200, parent.height - y)
+            visible: phase === 0
             Column {
-                anchors.centerIn: parent
+                id: emptyColumn
+                width: parent.width
+                anchors.verticalCenter: parent.verticalCenter
                 spacing: Tokens.spacingMd
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
@@ -172,10 +195,13 @@ Item {
                           ? qsTr("准备把 %1 端出去？").arg(VersionDetail.versionId)
                           : qsTr("先在「版本」里挑一个版本。")
                     color: Tokens.textMuted
+                    font.pixelSize: Tokens.fontSizeBody
+                    horizontalAlignment: Text.AlignHCenter
                 }
                 AppButton {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: qsTr("生成导出清单")
+                    iconName: "check"
                     primary: true
                     enabledByParent: VersionDetail.state === "ready"
                     onClicked: PackController.prepare(VersionDetail.versionId,
@@ -184,6 +210,7 @@ Item {
                 AppButton {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: qsTr("导入整合包（.mrpack / .zip）…")
+                    iconName: "import"
                     enabledByParent: !PackController.busy
                     onClicked: importDialog.open()
                 }
@@ -193,19 +220,20 @@ Item {
         Column {
             anchors.horizontalCenter: parent.horizontalCenter
             spacing: Tokens.spacingMd
-            visible: state === 1 || state === 3
+            visible: phase === 1 || phase === 3
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: state === 1
+                text: phase === 1
                        ? (PackController.busy ? PackController.taskStep : qsTr("正在生成清单…"))
                        : PackController.error
-                color: state === 3 ? Tokens.danger : Tokens.textMuted
+                color: phase === 3 ? Tokens.danger : Tokens.textMuted
+                font.pixelSize: Tokens.fontSizeBody
             }
             CircleProgress {
                 anchors.horizontalCenter: parent.horizontalCenter
                 width: 48
                 height: 48
-                visible: state === 1
+                visible: phase === 1
                 indeterminate: !PackController.busy || PackController.taskTotal === 0
                 value: PackController.taskTotal > 0
                        ? PackController.taskDone / PackController.taskTotal : 0
