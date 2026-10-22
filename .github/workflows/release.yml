@@ -218,10 +218,22 @@ jobs:
         shell: pwsh
         run: |
           if (-not (Test-Path "dist\SHA256SUMS.txt")) { throw "missing dist\SHA256SUMS.txt" }
-          Get-Content "dist\SHA256SUMS.txt"
-          Get-ChildItem "dist\BMCD-Setup-*.exe" | ForEach-Object {
-            if ($_.Length -le 0) { throw "empty installer" }
+          if (-not (Test-Path "dist\BMCD-windows-x64.zip")) { throw "missing portable zip" }
+          $setups = @(Get-ChildItem "dist\BMCD-Setup-*.exe")
+          if ($setups.Count -ne 1 -or $setups[0].Length -le 0) {
+            throw "expected exactly one non-empty installer"
           }
+          foreach ($line in Get-Content "dist\SHA256SUMS.txt") {
+            if ($line -notmatch '^([0-9a-fA-F]{64})\s+(.+)$') {
+              throw "malformed checksum line: $line"
+            }
+            $expected = $Matches[1].ToLowerInvariant()
+            $file = Join-Path "dist" $Matches[2]
+            if (-not (Test-Path $file)) { throw "checksum target missing: $file" }
+            $actual = (Get-FileHash -Algorithm SHA256 $file).Hash.ToLowerInvariant()
+            if ($actual -ne $expected) { throw "checksum mismatch: $file" }
+          }
+          Get-Content "dist\SHA256SUMS.txt"
 
       - uses: actions/upload-artifact@v4
         with:
