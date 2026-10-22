@@ -48,6 +48,25 @@ Copy-Item $Exe (Join-Path $Stage "bmcd.exe")
 Copy-Item (Join-Path $Root "LICENSE") (Join-Path $Stage "LICENSE.txt")
 Copy-Item (Join-Path $Root "README.md") (Join-Path $Stage "README.md")
 
+# windeployqt only deploys the VC++ runtime when it can find the Visual Studio
+# installation.  The hosted runner has VS installed but does not export
+# VCINSTALLDIR, so locate it explicitly and then fall back to the redistributable
+# or System32 for any DLL that still did not land in the stage.
+function Find-VisualStudio {
+    $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+    if (Test-Path $vswhere) {
+        $path = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+        if ($LASTEXITCODE -eq 0 -and $path) { return $path.Trim() }
+    }
+    return $null
+}
+
+$VsInstall = Find-VisualStudio
+if ($VsInstall) {
+    $env:VCINSTALLDIR = Join-Path $VsInstall "VC"
+    $env:VCToolsRedistDir = Join-Path $VsInstall "VC\Redist\MSVC"
+}
+
 # --compiler-runtime deploys the VC++ runtime DLLs next to the executable, so a
 # clean Windows machine does not need a separate redistributable install.
 & $Windeploy.Source --release --no-translations --compiler-runtime --dir $Stage (Join-Path $Stage "bmcd.exe")
@@ -58,9 +77,36 @@ foreach ($required in @("platforms\qwindows.dll", "Qt6Core.dll", "Qt6Quick.dll")
         throw "windeployqt output is missing $required"
     }
 }
+
+$runtimeNames = @("vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll",
+                  "msvcp140_1.dll", "msvcp140_2.dll", "concrt140.dll")
+$runtimeDirs = New-Object System.Collections.Generic.List[string]
+if ($VsInstall) {
+    $redistRoot = Join-Path $VsInstall "VC\Redist\MSVC"
+    if (Test-Path $redistRoot) {
+        Get-ChildItem $redistRoot -Directory |
+            Sort-Object Name -Descending |
+            ForEach-Object {
+                Get-ChildItem (Join-Path $_.FullName "x64") -Directory -Filter "Microsoft.VC*.CRT" -ErrorAction SilentlyContinue |
+                    ForEach-Object { $runtimeDirs.Add($_.FullName) }
+            }
+    }
+}
+$runtimeDirs.Add((Join-Path $env:SystemRoot "System32"))
+foreach ($name in $runtimeNames) {
+    $destination = Join-Path $Stage $name
+    if (Test-Path $destination) { continue }
+    foreach ($directory in $runtimeDirs) {
+        $candidate = Join-Path $directory $name
+        if (Test-Path $candidate) {
+            Copy-Item $candidate $destination -Force
+            break
+        }
+    }
+}
 foreach ($runtime in @("vcruntime140.dll", "msvcp140.dll")) {
     if (-not (Test-Path (Join-Path $Stage $runtime))) {
-        throw "windeployqt --compiler-runtime did not copy $runtime"
+        throw "could not stage the VC++ runtime $runtime"
     }
 }
 
