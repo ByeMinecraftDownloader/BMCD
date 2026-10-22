@@ -37,6 +37,7 @@ private:
     QTemporaryDir *m_dir = nullptr;
     QString m_gameDir;
     QString m_cacheDir;
+    QString m_javaPath;
 };
 
 void TestLoaderInstaller::initTestCase()
@@ -45,6 +46,28 @@ void TestLoaderInstaller::initTestCase()
     m_dir = new QTemporaryDir;
     QVERIFY(m_dir->isValid());
     QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, m_dir->path() + "/settings");
+
+    // LoaderInstaller rejects a non-executable Java path before consulting the
+    // test hook, so provide a harmless placeholder instead of depending on a
+    // JDK being installed on the CI runner.
+#ifdef Q_OS_WIN
+    m_javaPath = m_dir->path() + QStringLiteral("/java.exe");
+#else
+    m_javaPath = m_dir->path() + QStringLiteral("/java");
+#endif
+    QFile java(m_javaPath);
+    QVERIFY(java.open(QIODevice::WriteOnly));
+    java.write("placeholder");
+    java.close();
+#ifndef Q_OS_WIN
+    QVERIFY(QFile::setPermissions(m_javaPath,
+                                  QFileDevice::ReadOwner | QFileDevice::WriteOwner
+                                      | QFileDevice::ExeOwner | QFileDevice::ReadUser
+                                      | QFileDevice::ExeUser | QFileDevice::ReadGroup
+                                      | QFileDevice::ExeGroup | QFileDevice::ReadOther
+                                      | QFileDevice::ExeOther));
+#endif
+    QVERIFY(QFileInfo(m_javaPath).isExecutable());
 }
 
 void TestLoaderInstaller::init()
@@ -90,7 +113,7 @@ LoaderInstaller::Request TestLoaderInstaller::fabricRequest() const
     request.minecraftVersion = QStringLiteral("1.20.1");
     request.loaderType = QStringLiteral("fabric");
     request.loaderVersion = QStringLiteral("0.15.11");
-    request.javaPath = QStringLiteral("/usr/bin/java");
+    request.javaPath = m_javaPath;
     return request;
 }
 
@@ -146,7 +169,7 @@ void TestLoaderInstaller::installsFabricAndMergesProfile()
     QCOMPARE(installer.error(), QString());
     QCOMPARE(installer.state(), QStringLiteral("done"));
     QCOMPARE(installer.versionId(), versionId);
-    QCOMPARE(capturedProgram, QStringLiteral("/usr/bin/java"));
+    QCOMPARE(capturedProgram, m_javaPath);
     QCOMPARE(capturedArgs,
              QStringList({QStringLiteral("-jar"),
                           m_cacheDir + QStringLiteral("/loader/fabric-installer-1.0.1.jar"),

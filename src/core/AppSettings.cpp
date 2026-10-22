@@ -39,8 +39,8 @@ QString normaliseBase(const QString &base)
     while (path.endsWith(QLatin1Char('/')))
         path.chop(1);
     url.setPath(path);
-    url.setQuery({});
-    url.setFragment({});
+    url.setQuery(QString());
+    url.setFragment(QString());
     return url.toString();
 }
 
