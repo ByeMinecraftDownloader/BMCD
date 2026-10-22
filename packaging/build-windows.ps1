@@ -78,6 +78,16 @@ foreach ($required in @("platforms\qwindows.dll", "Qt6Core.dll", "Qt6Quick.dll")
     }
 }
 
+# The bundled zlib is a separate CMake target.  It is normally linked
+# statically, but stage the DLL if the toolchain produced a shared build.
+foreach ($zlibName in @("zlib.dll", "zlib1.dll")) {
+    $zlib = Get-ChildItem (Join-Path $Root $BuildDir) -Filter $zlibName -Recurse -File -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if ($zlib -and -not (Test-Path (Join-Path $Stage $zlibName))) {
+        Copy-Item $zlib.FullName (Join-Path $Stage $zlibName)
+    }
+}
+
 $runtimeNames = @("vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll",
                   "msvcp140_1.dll", "msvcp140_2.dll", "concrt140.dll")
 $runtimeDirs = New-Object System.Collections.Generic.List[string]

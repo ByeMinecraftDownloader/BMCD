@@ -193,9 +193,16 @@ jobs:
         shell: pwsh
         run: |
           & "dist\BMCD\bmcd.exe" --version
-          if ($LASTEXITCODE -ne 0) { throw "bmcd --version failed" }
+          $versionExit = $LASTEXITCODE
+          Write-Host "staged --version exit code: $versionExit"
+          if ($versionExit -ne 0) {
+            Get-ChildItem "dist\BMCD" | Select-Object Name, Length
+            throw "bmcd --version failed with $versionExit"
+          }
           & "dist\BMCD\bmcd.exe" --i18n-check
-          if ($LASTEXITCODE -ne 0) { throw "bmcd --i18n-check failed" }
+          $i18nExit = $LASTEXITCODE
+          Write-Host "staged --i18n-check exit code: $i18nExit"
+          if ($i18nExit -ne 0) { throw "bmcd --i18n-check failed with $i18nExit" }
 
       - name: Install and smoke the installer
         shell: pwsh
