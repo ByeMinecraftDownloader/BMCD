@@ -192,17 +192,7 @@ jobs:
       - name: Smoke the staged executable
         shell: pwsh
         run: |
-          & "dist\BMCD\bmcd.exe" --version
-          $versionExit = $LASTEXITCODE
-          Write-Host "staged --version exit code: $versionExit"
-          if ($versionExit -ne 0) {
-            Get-ChildItem "dist\BMCD" | Select-Object Name, Length
-            throw "bmcd --version failed with $versionExit"
-          }
-          & "dist\BMCD\bmcd.exe" --i18n-check
-          $i18nExit = $LASTEXITCODE
-          Write-Host "staged --i18n-check exit code: $i18nExit"
-          if ($i18nExit -ne 0) { throw "bmcd --i18n-check failed with $i18nExit" }
+          & packaging/windows/smoke-exe.ps1 -Exe "dist\BMCD\bmcd.exe"
 
       - name: Install and smoke the installer
         shell: pwsh
@@ -216,10 +206,7 @@ jobs:
           if ($proc.ExitCode -ne 0) { throw "installer exited with $($proc.ExitCode)" }
           $exe = Join-Path $installDir "bmcd.exe"
           if (-not (Test-Path $exe)) { throw "installed bmcd.exe not found at $exe" }
-          & $exe --version
-          if ($LASTEXITCODE -ne 0) { throw "installed bmcd --version failed" }
-          & $exe --i18n-check
-          if ($LASTEXITCODE -ne 0) { throw "installed bmcd --i18n-check failed" }
+          & packaging/windows/smoke-exe.ps1 -Exe $exe
 
       - name: Verify checksums
         shell: pwsh
