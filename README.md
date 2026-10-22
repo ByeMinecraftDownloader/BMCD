@@ -26,7 +26,7 @@
 ## 安装与运行
 
 正式发行物由 [`.github/workflows/release.yml`](.github/workflows/release.yml) 在推送
-版本 tag（如 `v1.0.0`）时构建并发布到 GitHub Release：
+版本 tag（如 `v0.1.0`）时构建并发布到 GitHub Release：
 
 - `bmcd-<version>-1-x86_64.pkg.tar.zst`（Arch Linux）
 - `bmcd_<version>_amd64.deb`（Debian/Ubuntu，自包含 `/opt/bmcd`）

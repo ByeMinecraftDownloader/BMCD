@@ -2,7 +2,7 @@
 # Build a self-contained Debian package from the AppDir produced by
 # packaging/build-appimage.sh.
 #
-#   packaging/debian/build-deb.sh --version 1.0.0 --appdir build/AppDir
+#   packaging/debian/build-deb.sh --version 0.1.0 --appdir build/AppDir
 #
 # The package installs the payload under /opt/bmcd and exposes /usr/bin/bmcd as
 # a symlink to its AppRun launcher.  Bundling Qt avoids depending on a distro

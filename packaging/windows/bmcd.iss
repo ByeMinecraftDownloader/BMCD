@@ -2,7 +2,7 @@
 ; Compile through packaging/windows/build-installer.ps1, which supplies the
 ; version, stage directory and output directory as /D macros.
 #ifndef MyAppVersion
-  #define MyAppVersion "1.0.0"
+  #define MyAppVersion "0.1.0"
 #endif
 #ifndef StageDir
   #define StageDir "..\..\dist\BMCD"

@@ -1,6 +1,6 @@
 # Build the BMCD Windows installer from the staged portable build.
 #
-#   pwsh packaging/windows/build-installer.ps1 -Version 1.0.0
+#   pwsh packaging/windows/build-installer.ps1 -Version 0.1.0
 #
 # Run packaging/build-windows.ps1 first; this script only compiles the Inno
 # Setup project and appends the installer hash to dist/SHA256SUMS.txt.

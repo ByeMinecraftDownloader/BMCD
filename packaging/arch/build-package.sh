@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build an Arch Linux package (.pkg.tar.zst) from this checkout.
 #
-#   packaging/arch/build-package.sh --version 1.0.0
+#   packaging/arch/build-package.sh --version 0.1.0
 #
 # The release workflow runs this inside an Arch container.  makepkg refuses to
 # run as root, so the script creates a throwaway `builder` user when invoked by

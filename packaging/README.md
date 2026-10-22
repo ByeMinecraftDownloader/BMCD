@@ -104,7 +104,7 @@ Ubuntu 24.04 上安装工具和 runtime，执行 `--no-install --working-tree` �
 ## Arch Linux
 
 ```bash
-packaging/arch/build-package.sh --version 1.0.0
+packaging/arch/build-package.sh --version 0.1.0
 ```
 
 脚本把工作区打成源码归档，在 `build/archpkg/` 里用 `makepkg` 构建，产物为
@@ -116,7 +116,7 @@ root 调用时会自动切换到临时 `builder` 用户。发行包依赖系统 
 
 ```bash
 packaging/build-appimage.sh                    # 先产出 build/AppDir
-packaging/debian/build-deb.sh --version 1.0.0
+packaging/debian/build-deb.sh --version 0.1.0
 ```
 
 `.deb` 把 AppDir 安装到 `/opt/bmcd`，通过 `/usr/bin/bmcd -> /opt/bmcd/AppRun`
@@ -129,7 +129,7 @@ packaging/debian/build-deb.sh --version 1.0.0
 ```powershell
 pwsh packaging/build-windows.ps1
 pwsh packaging/build-windows.ps1 -Sign -CertificateThumbprint <thumbprint>
-pwsh packaging/windows/build-installer.ps1 -Version 1.0.0
+pwsh packaging/windows/build-installer.ps1 -Version 0.1.0
 ```
 
 在 Windows runner 完成 `cmake --build build --config Release` 后运行；要求
@@ -160,8 +160,8 @@ VM 手工验证，本仓库没有 Windows VM，不能拿 CI 启动代替。
 发布前请先确认本地 `ctest` 通过，再推 tag：
 
 ```bash
-git tag -a v1.0.0 -m "BMCD 1.0.0"
-git push origin v1.0.0
+git tag -a v0.1.0 -m "BMCD 0.1.0 internal beta"
+git push origin v0.1.0
 ```
 
 workflow 使用仓库自带的 `GITHUB_TOKEN`（`contents: write`），不需要额外的 PAT。

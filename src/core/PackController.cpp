@@ -566,7 +566,7 @@ bool PackController::adoptPack(const QString &json)
     m_cooked = false;
     m_lastOutput.clear();
     m_pack.target = cookingDir();
-    m_pack.generator = QStringLiteral("1.0.0");
+    m_pack.generator = QStringLiteral("0.1.0");
     m_confirmed.clear();
     m_conflictCount = 0;
     m_missingFiles.clear();

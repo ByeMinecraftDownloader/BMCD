@@ -25,19 +25,9 @@
   </categories>
   <content_rating type="oars-1.1"/>
   <releases>
-    <release version="1.0.0" date="2026-10-23">
+    <release version="0.1.0" date="2026-10-23">
       <description>
-        <p>Install-chain and packaging release: Java/loader setup, cooking session and Linux/Windows artifacts.</p>
-      </description>
-    </release>
-    <release version="0.4.0" date="2026-10-21">
-      <description>
-        <p>Packaging milestone: AppImage (with Flatpak manifest alongside).</p>
-      </description>
-    </release>
-    <release version="0.3.0" date="2026-10-20">
-      <description>
-        <p>Parallel download queue with SHA-1 verification and installed badges.</p>
+        <p>Internal beta: install-chain and packaging validation.</p>
       </description>
     </release>
   </releases>

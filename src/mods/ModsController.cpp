@@ -269,7 +269,7 @@ void ModsController::applyPlan(const mods::ResolveResult &result)
                              .arg(QDateTime::currentDateTimeUtc().toString(QStringLiteral("yyyyMMdd-HHmmss")));
     pack.minecraftVersion = m_gameVersion;
     pack.loaderType = m_loader;
-    pack.generator = QStringLiteral("1.0.0");
+    pack.generator = QStringLiteral("0.1.0");
     pack.description = QStringLiteral("由 BMCD 模组选择生成");
 
     QHash<QString, mods::Project> projects;

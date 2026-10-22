@@ -228,7 +228,7 @@ void setCoreMetadata()
 {
     QCoreApplication::setApplicationName(QStringLiteral("bmcd"));
     QCoreApplication::setOrganizationName(QStringLiteral("BMCD"));
-    QCoreApplication::setApplicationVersion(QStringLiteral("1.0.0"));
+    QCoreApplication::setApplicationVersion(QStringLiteral(BMCD_VERSION));
 }
 
 // Some environments swallow Qt's console output entirely; MC_LOG answers

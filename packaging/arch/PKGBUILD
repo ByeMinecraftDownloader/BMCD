@@ -2,7 +2,7 @@
 # Built by packaging/arch/build-package.sh in release CI.  The source archive
 # is created from the exact tag checkout, so `sha256sums` is filled in there.
 pkgname=bmcd
-pkgver=1.0.0
+pkgver=0.1.0
 pkgrel=1
 pkgdesc='Minecraft resource downloader with launcher setup and pack support'
 arch=('x86_64')
