@@ -26,6 +26,10 @@ public:
 
     int count() const { return rowCount(); }
 
+    // Used by the deep link (--select) to find a row without instantiating
+    // every delegate in QML.
+    Q_INVOKABLE int indexOfVersion(const QString &versionId) const;
+
 signals:
     void searchTextChanged();
     void channelChanged();

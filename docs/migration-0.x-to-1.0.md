@@ -14,9 +14,12 @@
 - 新增：
   - `--import <file>`：导入整合包；加 `--to <dir>` 才会下载并部署。
   - `--instances` / `--instances-root <dir>`：查看发现的实例。
-  - `--lang <en|zh_CN>`：切换界面语言；也可用 `BMCD_LANG`，默认跟随系统 locale。
+  - `--lang <code>`：`en` 加载英文，其他值回落到中文源；也可用 `BMCD_LANG`，
+    默认跟随系统 locale（`en*` 才加载英文）。
+  - `--fetch-model`：下载可选的 RAG 模型（约 135 MB）；索引仍按需构建。
   - `--i18n-check`：自检内置英文翻译。
-  - `--benchmark`：输出首帧与 RSS。
+  - `--benchmark` / `--view` / `--size` / `--dump-layout`：启动性能、指定视图、
+    窗口尺寸与布局诊断。
 
 ## 数据与缓存
 

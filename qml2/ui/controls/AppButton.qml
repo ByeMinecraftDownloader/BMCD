@@ -16,15 +16,17 @@ Rectangle {
     implicitWidth: content.implicitWidth + horizontalPadding * 2
     implicitHeight: Math.max(34, content.implicitHeight + verticalPadding * 2)
     radius: Tokens.radiusSm
-    opacity: enabledByParent ? 1 : 0.45
-    color: danger ? (mouse.pressed ? Qt.darker(Tokens.danger, 1.15) : Tokens.danger)
+    // Disabled is a state, not a faded copy: keep the text legible and drop the
+    // accent fill so it never reads as "broken but clickable".
+    color: !enabledByParent ? Tokens.surfaceAlt
+         : danger ? (mouse.pressed ? Qt.darker(Tokens.danger, 1.15) : Tokens.danger)
          : primary ? (mouse.pressed ? Qt.darker(Tokens.primary, 1.15) : Tokens.primary)
          : (mouse.pressed ? Tokens.surfaceHigh : hover.hovered ? Tokens.surfaceHigh : Tokens.surfaceAlt)
-    border.width: primary || danger ? 0 : 1
-    border.color: Tokens.outline
+    border.width: !enabledByParent || (!primary && !danger) ? 1 : 0
+    border.color: !enabledByParent ? Tokens.hairline : Tokens.outline
 
     Behavior on color { ColorAnimation { duration: Motion.micro } }
-    scale: mouse.pressed ? 0.98 : 1.0
+    scale: enabledByParent && mouse.pressed ? 0.98 : 1.0
     Behavior on scale { NumberAnimation { duration: Motion.micro; easing.type: Motion.outCubic } }
 
     Accessible.role: Accessible.Button
@@ -39,13 +41,15 @@ Rectangle {
             visible: button.iconName !== ""
             name: button.iconName
             size: 15
-            color: button.danger ? Tokens.background
+            color: !button.enabledByParent ? Tokens.textMuted
+                 : button.danger ? Tokens.background
                  : button.primary ? Tokens.primaryInk : Tokens.text
         }
         Text {
             id: label
             text: button.text
-            color: button.danger ? Tokens.background
+            color: !button.enabledByParent ? Tokens.textMuted
+                 : button.danger ? Tokens.background
                  : button.primary ? Tokens.primaryInk : Tokens.text
             font.pixelSize: Tokens.fontSizeBody
             font.weight: button.primary ? Font.DemiBold : Font.Normal
@@ -58,7 +62,7 @@ Rectangle {
         id: mouse
         anchors.fill: parent
         enabled: button.enabledByParent
-        cursorShape: Qt.PointingHandCursor
+        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
         onClicked: button.clicked()
     }
 }

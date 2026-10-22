@@ -2,51 +2,63 @@
 
 **BMCD** 是 Qt 6 / Qt Quick 写的 Minecraft 资源下载与整合包工具：
 从官方版本清单下载游戏文件，也能导入、校验、部署和导出 `.mrpack` / CurseForge / FTB 整合包。
-界面按「点菜 → 烹饪 → 上菜 → 设置」四步组织，配色跟随桌面 matugen 色板。
+界面按「点菜 → 烹饪 → 出餐 → 设置」组织，配色跟随桌面 matugen 色板。
 
 | 点菜 | 烹饪 |
 |---|---|
 | ![点菜页](docs/preview-order.png) | ![烹饪页](docs/preview-cook.png) |
-| **上菜** | **设置** |
-| ![上菜页](docs/preview-serve.png) | ![设置页](docs/preview-settings.png) |
+| **出餐** | **设置** |
+| ![出餐页](docs/preview-serve.png) | ![设置页](docs/preview-settings.png) |
 
-## 1.0 能做什么
+## 功能
 
-| 区域 | 能力 |
-|---|---|
-| 点菜（Order） | 版本清单（正式/快照/全部）、搜索、本地 RAG 模组提示、安装状态徽章 |
-| 烹饪（Cook） | 并行下载（默认 6 并发）、断点续传、SHA-1 校验、暂停/继续/取消、失败重试 |
-| 上菜（Serve） | 部署到游戏目录（staging + 原子替换 + 回滚）、导出 `.mrpack` / FTB、自包含包（许可闸门 + NOTICE + `redistribution.json`） |
-| 设置（Settings） | 主题诊断、语言、版本/已安装刷新、本地检索索引状态 |
-| 包生态 | 导入 `.mrpack`、CurseForge zip、FTB 包；发现 `.minecraft`（HMCL/PCL 默认目录）/ Prism / MultiMC 实例 |
-| 主题 | 读取 matugen 生成的 KDE 色板 → Lab/LCh → 设计 token；色板缺失时回退内置主题 |
-| 本地检索 | SQLite FTS5 + 可选 onnxruntime 向量；无模型时 hashing 降级仍可用 |
-| 多语言 | 中文为源语言，内置英文 Qt Linguist 翻译（`--lang en`，或跟随系统 locale） |
+- **下载**：官方版本清单、正式/快照筛选、并行下载（默认 6）、断点续传、SHA-1 校验、暂停/继续/取消；
+  设置页可配置 Modrinth CDN、Mojang 镜像（如 BMCLAPI）、主源失败后的自动回退，以及临时下载目录。
+- **整合包**：导入 `.mrpack` / CurseForge zip / FTB；部署到游戏目录（staging、备份、回滚）；
+  导出引用式 `.mrpack` / FTB；自包含导出带许可闸门、NOTICE 与 `redistribution.json`。
+- **界面**：Qt Quick 四视图（点菜 / 烹饪 / 出餐 / 设置），跟随系统色板，中英文切换。
+- **检索**：1.0 只有版本号/类型搜索；1.1 目标为基础查表检索（名称/别名/分类，按 loader/版本过滤），不加载向量模型；RAG 向量知识库延后到 1.6，`--rag-*` 仅保留为实验后端。
+- **发行**：Linux Arch 包、Debian 包、Windows 安装包（由版本 tag 触发的 GitHub Release 产出），以及 AppImage/Flatpak 辅助产物。
 
-界面规范见 [`docs/ui-spec-1.0.md`](docs/ui-spec-1.0.md)，版本节奏见 [`docs/roadmap-1.0.md`](docs/roadmap-1.0.md)，
-RAG 评测见 [`docs/rag-eval.md`](docs/rag-eval.md)，Windows 稳定性项见 [`docs/windows-stability.md`](docs/windows-stability.md)。
+> 阶段顺序、能力边界、未交付项和验收证据只在
+> [`docs/plan.md`](docs/plan.md) 维护；README 不重复状态。
 
 ## 安装与运行
+
+正式发行物由 [`.github/workflows/release.yml`](.github/workflows/release.yml) 在推送
+版本 tag（如 `v1.0.0`）时构建并发布到 GitHub Release：
+
+- `bmcd-<version>-1-x86_64.pkg.tar.zst`（Arch Linux）
+- `bmcd_<version>_amd64.deb`（Debian/Ubuntu，自包含 `/opt/bmcd`）
+- `BMCD-Setup-<version>-x64.exe`（Windows 安装包，另附便携 zip）
+- `SHA256SUMS`
 
 ### AppImage（Linux）
 
 ```bash
 packaging/build-appimage.sh                 # 构建 build/BMCD-x86_64.AppImage
-./build/BMCD-x86_64.AppImage
+./build/BMCD-x86_64.AppImage                 # 发布基线为 Ubuntu 22.04 / glibc 2.35
 ```
 
-AppImage 自带 Qt 运行库，不包含 RAG 模型（模型可选下载：`bmcd --fetch-model`，见下文）。
+AppImage 自带 Qt 运行库，不包含 RAG 实验模型；基础查表检索不依赖模型或索引。
+构建机 glibc 高于 2.35 时脚本会拒绝，避免把开发机的 glibc 绑进产物。
 
 ### Flatpak
 
-清单在 `packaging/flatpak/`，构建脚本 `packaging/build-flatpak.sh`，说明见 [`packaging/README.md`](packaging/README.md)。
-Flatpak 需要 `flatpak-builder` 与 flathub remote；本机未安装故只做了清单与构建路径验证。
+清单的源是固定 commit 的 `type: git`；构建脚本、bundle 和 sha256 说明见
+[`packaging/README.md`](packaging/README.md)。
+
+### Windows
+
+在 Windows 构建目录旁运行 `pwsh packaging/build-windows.ps1`，产出
+`dist/BMCD-windows-x64.zip` 与 `dist/SHA256SUMS.txt`；无证书时包内
+`UNSIGNED.txt` 会明确标记未签名。
 
 ### 从源码构建
 
 依赖：CMake ≥ 3.21、Ninja、Qt ≥ 6.5（Core/Gui/Quick/Qml/Network/Concurrent/Sql/Svg/Test）、
 zlib（Linux/macOS 用系统包；Windows 没有系统 zlib 时 CMake 自动从源码拉取
-v1.3.1 并静态链接）；RAG 向量检索可选 onnxruntime。
+v1.3.1 并静态链接）；RAG 实验后端可选 onnxruntime（1.6 再启用，当前基础检索不依赖）。
 
 ```bash
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -69,17 +81,18 @@ bmcd --import pack.mrpack --to DIR   # 导入 + 下载 + 部署
 bmcd --pack pack.json --to DIR       # 部署既有清单（--dry-run 预检）
 bmcd --pack pack.json --format mrpack --out out.mrpack
 bmcd --pack pack.json --format ftb --out out.zip
-bmcd --pack pack.json --format self --out self.mrpack --licenses --confirm mods/x.jar
+bmcd --pack pack.json --format self --out self.mrpack --licenses --confirm @project:<id>
 bmcd --pack pack.json --verify DIR
 bmcd --instances [--instances-root DIR]
-bmcd --fetch-model                    # 下载可选 RAG 模型（约 130 MB）
-bmcd --rag-build --from-docs docs
-bmcd --ask "fabric 怎么装" --top 5
+bmcd --fetch-model                    # 实验后端：下载可选 RAG 模型（约 135 MB，1.6 前不参与搜索）
+bmcd --rag-build --from-docs docs      # 实验后端：构建索引
+bmcd --ask "fabric 怎么装" --top 5     # 实验后端：文本提示
 bmcd --i18n-check                    # 校验内置英文翻译
 bmcd --benchmark                     # 首帧/RSS 性能数字（离屏）
 ```
 
-`--help` 有完整选项说明。整合包导入支持：
+开发/截图诊断：`--view order|cook|serve|settings`、`--size WxH`、`--dump-layout`；
+它们不改变业务行为。`--help` 有完整选项说明。整合包导入支持：
 
 - **Modrinth**：`modrinth.index.json`，读取 `files[]` 的 path/hashes/downloads/env 与 `overrides`/`client-overrides`；
 - **CurseForge**：`manifest.json`，带 `url` 的文件直接使用；没有 URL 的文件在设置
@@ -91,10 +104,10 @@ bmcd --benchmark                     # 首帧/RSS 性能数字（离屏）
 | 内容 | 路径 |
 |---|---|
 | 版本清单缓存 | `~/.cache/BMCD/bmcd/version_manifest_v2.json` |
-| 下载/部署临时区 | `~/.local/share/BMCD/bmcd/` |
+| 下载/部署临时区 | 默认 `~/.cache/BMCD/bmcd/downloads/`；可在设置页指定父目录，实际使用其下 `BMCD/downloads/` |
 | 整合包导入 staging | `~/.local/share/BMCD/bmcd/imports/<hash>/` |
-| RAG 索引 | `~/.cache/BMCD/bmcd/rag/index.sqlite` |
-| RAG 模型（可选） | `~/.cache/BMCD/bmcd/models/e5-small/` |
+| RAG 实验索引（1.6 前不参与搜索） | `~/.cache/BMCD/bmcd/rag/index.sqlite` |
+| RAG 实验模型（可选） | `~/.cache/BMCD/bmcd/models/e5-small/` |
 | 日志（设置 `MC_LOG`） | 指定文件 |
 
 ## 翻译
@@ -109,25 +122,12 @@ bmcd --benchmark                     # 首帧/RSS 性能数字（离屏）
 编译产物 `i18n/bmcd_en.qm` 随源码提交，并由 CMake 资源编进可执行文件，
 因此各平台构建不依赖 Qt Linguist；`--i18n-check` 用 6 条探针验证翻译确实被加载。
 
-## 性能预算（1.0）
+## 文档
 
-在本机（Linux, 12 核, Release, offscreen）实测：
-
-```
-benchmark: first-frame 123–138 ms, window-created 107–126 ms, rss 70 MB
-```
-
-要求为启动 < 1 s、点菜首屏 < 300 ms、RSS < 200 MB；`bmcd --benchmark` 可复现。
-首屏数字是窗口创建到首帧的代理指标，不含版本清单的网络往返。
-
-## 已知限制
-
-- 不安装 Java，不集成 Forge/NeoForge 安装器（需要起 JVM，按路线图单独立项）。
-- 不自建 mod 托管/CDN；下载地址来自官方清单或整合包元数据。
-- CurseForge 无 URL 的包需要 `CURSEFORGE_API_KEY`，否则相关文件会跳过。
-- RAG 模型不随包分发（AppImage 保持体积）；未下载模型时使用 hashing 降级。
-- v1 单文件界面已在 1.0 移除；`qml2/` 是唯一 UI，升级见迁移指南。
-- 三平台安装包由 CI 构建且未签名；本仓库只在 Linux 上做了本地构建、测试与运行验证。
+- 阶段、能力边界与验收证据：[docs/plan.md](docs/plan.md)
+- 界面契约：[docs/ui-spec-1.0.md](docs/ui-spec-1.0.md)
+- 从 0.x 升级：[docs/migration-0.x-to-1.0.md](docs/migration-0.x-to-1.0.md)
+- 打包：[packaging/README.md](packaging/README.md)
 
 ## 许可证
 

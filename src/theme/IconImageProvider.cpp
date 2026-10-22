@@ -8,8 +8,8 @@ namespace {
 const QHash<QString, QString> &iconPaths()
 {
     static const QHash<QString, QString> paths = {
-        {QStringLiteral("versions"), QStringLiteral("<path d=\"M4 6h16M4 12h16M4 18h10\"/>")},
-        {QStringLiteral("queue"), QStringLiteral("<path d=\"M4 6h10M4 12h10M4 18h6\"/><path d=\"M16 9l5 3-5 3z\"/>")},
+        {QStringLiteral("versions"), QStringLiteral("<path d=\"M12 3l9 5-9 5-9-5zM3 12l9 5 9-5M3 16l9 5 9-5\"/>")},
+        {QStringLiteral("queue"), QStringLiteral("<circle cx=\"4.5\" cy=\"6\" r=\"1\" fill=\"COLOR\" stroke=\"none\"/><circle cx=\"4.5\" cy=\"12\" r=\"1\" fill=\"COLOR\" stroke=\"none\"/><circle cx=\"4.5\" cy=\"18\" r=\"1\" fill=\"COLOR\" stroke=\"none\"/><path d=\"M9 6h11M9 12h11M9 18h7\"/>")},
         {QStringLiteral("serve"), QStringLiteral("<path d=\"M12 16V4M7 9l5-5 5 5M4 16v4h16v-4\"/>")},
         {QStringLiteral("export"), QStringLiteral("<path d=\"M12 16V4M7 9l5-5 5 5M4 16v4h16v-4\"/>")},
         {QStringLiteral("settings"), QStringLiteral("<path d=\"M4 7h16M4 12h16M4 17h16\"/><circle cx=\"9\" cy=\"7\" r=\"2\"/><circle cx=\"15\" cy=\"12\" r=\"2\"/><circle cx=\"8\" cy=\"17\" r=\"2\"/>")},

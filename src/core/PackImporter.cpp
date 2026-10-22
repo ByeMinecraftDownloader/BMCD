@@ -15,6 +15,7 @@
 #include <QNetworkRequest>
 #include <QStandardPaths>
 #include <QTimer>
+#include <QUrl>
 
 namespace {
 
@@ -128,8 +129,11 @@ QString firstDownload(const QJsonArray &downloads)
 {
     for (const QJsonValue &value : downloads) {
         const QString url = value.toString();
-        if (url.startsWith(QLatin1String("https://")) || url.startsWith(QLatin1String("http://")))
-            return url;
+        if (!url.startsWith(QLatin1String("https://")) && !url.startsWith(QLatin1String("http://")))
+            continue;
+        // FTB's API returns unescaped spaces in paths (e.g. "FTB Academy-1.1.0").
+        const QUrl parsed(url);
+        return parsed.isValid() ? parsed.toString(QUrl::FullyEncoded) : url;
     }
     return {};
 }
@@ -156,10 +160,12 @@ QString hashByAlgo(const QJsonValue &hashes, const QString &algo, const QString 
 
 QString sha1FromHashes(const QJsonValue &hashes)
 {
-    QString sha1 = hashByAlgo(hashes, QStringLiteral("sha1"), QStringLiteral("1"));
-    if (!sha1.isEmpty())
-        return sha1;
-    return hashByAlgo(hashes, QStringLiteral("sha512"), QStringLiteral("2"));
+    return hashByAlgo(hashes, QStringLiteral("sha1"), QStringLiteral("1"));
+}
+
+QString sha256FromHashes(const QJsonValue &hashes)
+{
+    return hashByAlgo(hashes, QStringLiteral("sha256"), QStringLiteral("3"));
 }
 
 QString sha512FromHashes(const QJsonValue &hashes)
@@ -273,6 +279,7 @@ ImportResult importPackArchive(const QString &archivePath)
             file.path = object.value(QStringLiteral("path")).toString();
             file.size = qint64(object.value(QStringLiteral("fileSize")).toDouble());
             file.sha1 = sha1FromHashes(object.value(QStringLiteral("hashes")));
+            file.sha256 = sha256FromHashes(object.value(QStringLiteral("hashes")));
             file.sha512 = sha512FromHashes(object.value(QStringLiteral("hashes")));
             file.url = firstDownload(object.value(QStringLiteral("downloads")).toArray());
             file.kind = kindForPath(file.path);
@@ -359,6 +366,8 @@ ImportResult importPackArchive(const QString &archivePath)
             file.size = qint64(object.value(QStringLiteral("fileSize")).toDouble());
             file.url = firstDownload(object.value(QStringLiteral("downloads")).toArray());
             file.sha1 = sha1FromHashes(object.value(QStringLiteral("hashes")));
+            file.sha256 = sha256FromHashes(object.value(QStringLiteral("hashes")));
+            file.sha512 = sha512FromHashes(object.value(QStringLiteral("hashes")));
             file.kind = kindForPath(file.path);
             applyEnvironment(&file, object.value(QStringLiteral("env")).toObject(), &result);
             if (!isSafeRelativePath(file.path)) {

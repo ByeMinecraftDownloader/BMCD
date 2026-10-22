@@ -10,6 +10,7 @@ QString defaultGameDir();
 
 // Per-user cache directory (version manifest, pack index, ...).
 QString cacheDir();
+QString downloadsDir();
 
 // Per-user config directory.
 QString configDir();

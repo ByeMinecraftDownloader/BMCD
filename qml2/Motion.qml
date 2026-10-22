@@ -1,13 +1,14 @@
 pragma Singleton
 import QtQuick
 import BMCD as Bmcd
+import BMCD.Settings 1.0
 
 // One rhythm for the whole app. Durations live here and nowhere else; when the
 // system asks for reduced motion every one of them collapses to a short fade.
 QtObject {
     id: motion
 
-    readonly property bool reduced: Bmcd.Palette.reduceMotion
+    readonly property bool reduced: AppSettings.reduceMotion
 
     readonly property int micro: reduced ? 90 : 120      // hover, press, tiny shifts
     readonly property int standard: reduced ? 110 : 180  // card entry, badge bump

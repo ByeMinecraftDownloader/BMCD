@@ -2,14 +2,15 @@
 
 日期 2026-10-21。基线：0.4.0（M0–M4 完成，AppImage 已通过，Windows 未验证）。
 
-**状态更新（2026-10-21）**：0.5–1.0 已交付；验收记录与差异见
-[`docs/release-notes-1.0.md`](release-notes-1.0.md)。
+> **设计档案（历史）**：本文记录 1.0 的设计依据、原始决议与风险，不维护阶段规划或状态。
+> 单一阶段表、能力边界与验收证据见 [`plan.md`](plan.md)。
 
 **主人已拍板（2026-10-21）**：
 1. 色板采用 **B 方案**（读系统强调色 + matugen 同款算法生成 token，A 方案作运行时回退）；
 2. 产出界面用「点菜 → 烹饪 → 上菜」三段式叙事，上菜页**两个出口平等**：出菜到文件夹、出菜到整合包；
 3. UI 与动画由本方案设计（见 §2.4「动效语言」）；
-4. **RAG 嵌入模型内嵌**（随安装包分发，不做首次下载）；
+4. **RAG 模型分发（交付修订）**：原计划内嵌；因 int8 模型 118 MB + tokenizer 17 MB，
+   改为可选下载（`--fetch-model`）、索引按需构建，见 §4.5；
 5. **允许自包含包**（带 mod 本体导出），但必须走许可判定 + NOTICE + 显式确认（§3.5）。
 
 本文回答四件事：**跨平台怎么硬化、UI 怎么重构、产出形态怎么选、RAG 检索怎么做**，最后给出
@@ -61,7 +62,7 @@ CMake 里按平台挑源文件。抽象层全部可注入假实现 → 单元测
 
 现状：`src/theme/Palette.cpp` 只认 XDG 的 `color-schemes/*.colors`（DankMatugen 那套），
 Windows 上永远走 `applyFallback()` 的固定深色。**决议：B 方案**——读系统强调色，用 matugen 同款
-算法生成 26 个 token，A 作为运行时回退，C 推迟到 1.1。
+算法生成 26 个 token，A 作为运行时回退，C 推迟（未排期）。
 
 实现要点（落在 `src/platform/SubjectTheme.cpp` + `src/theme/TokenBuilder.cpp`）：
 
@@ -74,7 +75,7 @@ Windows 上永远走 `applyFallback()` 的固定深色。**决议：B 方案**�
 | 输出 | 只输出 **design token**：`surface / surfaceContainer / onSurface / onSurfaceVariant / primary / onPrimary / outline / danger / success`。QML 层禁止直接读色板文件 |
 
 明确边界：**B 方案只负责「产出 token」**，怎么用由 0.8 的 UI 决定。所以 0.5 就要把 TokenBuilder
-落地并写死契约（token 名字永不改），0.8 才能只改 QML 不返工。C 方案（壁纸取色）列进 1.1 备选。
+落地并写死契约（token 名字永不改），0.8 才能只改 QML 不返工。C 方案（壁纸取色）作为未排期备选。
 
 ---
 
@@ -110,16 +111,18 @@ Windows 上永远走 `applyFallback()` 的固定深色。**决议：B 方案**�
 
 - **Cook 是全局的**，不是 Order 的子页——用户在点菜时就该看见锅在烧，烹饪过程不该藏起来；
 - **Serve 是授权点**：两个出口点了都要先做空间/权限/覆盖检查（§3.4），不许点了才失败；
-- **比喻只做结构、不做措辞**：代码里叫 `OrderView/CookView/ServeView`，界面上写「版本/模组/导出」
+- **比喻只做结构、不做措辞**：代码里叫 `OrderView/CookView/ServeView`，界面上写「版本/队列/导出」
   更清楚——不能真在按钮上写「上菜」，那是内部叙事，不是用户文案。
 
 ### 2.3 组件库与状态机
 
 - 新建 `qml2/`（QML 模块 `BMCD.UI`），先落 `ui/controls/`：`Button`、`IconButton`、`Card`、`Field`、
-  `Toast`、`Dialog`、`ProgressRing`、`RippleCanvas`、`WindowChrome`（含 min/max/双击最大化/Snap），
+  `Toast`、`Dialog`、`ProgressRing`、`RippleCanvas`、`WindowChrome`（含 min/max/双击/八向 resize；
+  Snap 为原计划项，**未实现**），
   外加 `Motion.qml` 单例（§2.4 的节奏常量）与 `Tokens.qml`（1.3 的 design token，QML 侧唯一颜色入口）。
-- 每个视图必须显式实现五个状态：`empty | loading | partial | error | success`，用 `state` 属性而不是
-  堆 `visible`；`partial` 是本项目的真实常态（部分文件失败、部分已存在），必须有专门视觉。
+- 每个视图必须显式实现五个状态：`empty | loading | partial | error | success`，用显式属性而不是
+  堆 `visible`。**交付修订**：`OrderView` 实际用 `phase`（QML 内建 `Item.state` 会遮蔽未限定绑定），
+  `partial` 预留未触发；其他视图由后端状态驱动。
 - 交互逻辑先写文档 `docs/ui-spec-1.0.md`：键盘流（`/` 聚焦搜索、`↑↓` 选版本、`Enter` 下载、`Esc` 取消）、
   鼠标流（拖入 `.mrpack` 即导入、右键版本卡片出菜单）、动画预算（同屏最多一个水波动画，60 fps，
   降级为静态光晕）、无障碍（焦点环、`Accessible.name`、`reduceMotion`）。
@@ -131,7 +134,7 @@ CPU/GPU 都要付得起。
 
 | 阶段 | 决定性瞬间 | 编排 |
 |---|---|---|
-| 点菜 | **落章**（把版本/模组放进清单） | 卡片按下 0.96 → 回弹 1.0（spring，220 ms）；右上角描边环 160 ms 画满；清单徽章 `1→1.18→1`（OutCubic，260 ms）；重复点同一项只加计数，不抖动 |
+| 点菜 | **落章**（把版本放进清单） | 卡片按下 0.96 → 回弹 1.0（spring，220 ms）；右上角描边环 160 ms 画满；清单徽章 `1→1.18→1`（OutCubic，260 ms）；重复点同一项只加计数，不抖动 |
 | 烹饪 | **入锅 / 出锅** | 新任务自队列底滑入 4 px 并淡入（180 ms）；单文件完成时该行左侧 2 px 竖条闪一次 primary→outline 后消失（240 ms）；总进度线只在「新增/完成」时动，**不持续闪烁** |
 | 上菜 | **成形** | 波纹汇聚或扩散（§3.3）+ 完成定格：logo 描边跑一圈 700 ms，成品图标淡入 300 ms |
 
@@ -153,6 +156,7 @@ CPU/GPU 都要付得起。
 ### 2.5 迁移与验收
 
 - `qml/Main.qml` **冻结**，只修崩溃；新界面用 `--ui=v2` 开关并存两个版本一个迭代，0.8 末删旧文件。
+  （历史计划；1.0 已删除 v1 与 `--ui` 开关。）
 - 视觉回归：把现在的截图哈希对比升级成 `tests/golden/`（每视图 × 亮/暗 × 100%/150% 缩放，
   离屏渲染后像素 diff 阈值 0.1%），CI 里跑。这比「我觉得挺好看」可靠。
 
@@ -285,7 +289,7 @@ UI 上就是上菜页成品卡片的「许可状态」字段：`全部可分发 
 | 抓取 | Modrinth `/v2/search` 全量 project 元数据 + `/v2/project/{id}` 的 body(markdown)；CF 走 cfwidget（官方 API 仍 403） | 目标 5 万 project 级 |
 | 清洗 | 去 HTML/badge/图片、去重复模板段、保留标题层级 | 丢弃 <40 字符的段 |
 | 切块 | project 级 1 块（标题+短描述+分类）+ body 按 `##` 标题切，超长再按 400 token 滑窗（overlap 60） | chunk 上限 400 tok |
-| 嵌入 | **已定：`multilingual-e5-small` 内嵌**；HF `Xenova/multilingual-e5-small` 实测 int8 `onnx/model_quantized.onnx` **118 MB**、fp16 235 MB、fp32 470 MB、`tokenizer.json` 17 MB、`sentencepiece.bpe.model` 5 MB（比初估 40 MB 大）；故**模型单独可选下载**（`--fetch-model`），索引**按需构建**、不随包分发种子索引；`bge-m3` 作为可选高质量档，不打包 | 归一化后余弦 |
+| 嵌入 | **交付修订：`multilingual-e5-small` 可选下载**（原“内嵌”决议因体积撤销）。HF `Xenova/multilingual-e5-small` 实测 int8 `onnx/model_quantized.onnx` **118 MB**、fp16 235 MB、fp32 470 MB、`tokenizer.json` 17 MB、`sentencepiece.bpe.model` 5 MB；`--fetch-model` 下载，索引**按需构建**、不随包分发种子索引；`bge-m3` 作为可选高质量档，不打包 | 归一化后余弦 |
 | 索引 | SQLite 单文件：`chunks(id, project, text, vec BLOB)` + `FTS5(text)`；**向量用 int8 量化**：5 万 × 384 = **19.2 MB**（float32 是 77 MB），暴力余弦 on CPU（SIMD）p95 < 50 ms | 预留 `sqlite-vec` 扩展位 |
 | 检索 | **混合**：FTS5(unicode61，英文侧) + 向量；融合用 RRF(k=60) | top 100 候选 |
 | 过滤 | 结构化硬过滤：loader / game_version / project_type / 客户端服务端 | 必须在排序前 |
@@ -331,24 +335,10 @@ src/rag/
 
 ---
 
-## 5. 版本节奏与出口标准
+## 5. 版本节奏
 
-| 版本 | 主题 | 内容 | 出口（不达标不发） |
-|---|---|---|---|
-| **0.5** | 跨平台地基 + 主题 | `src/platform/*` 抽象 + §1.2 全部门槛；Windows P0/P1 修完；**色板 B 方案落地**（`SubjectTheme` + `TokenBuilder` + 对比度门禁 + A 回退）；三平台 CI | Windows 真机「双击→下载→0 downloaded」闭环；三平台 CI 绿；Windows 上 token 与 matugen 同源色误差 ≤ 1/255 |
-| **0.6** | 上菜（包模型） | `PackModel` + 两个出口（`MrpackRenderer` 引用式 / `Deployer`，staging+原子替换+回滚）；`Renderer` 接口留好自包含插槽；**上菜页 UI + 水波双方向 + 动效 v1**（`Motion.qml` 常量、落章/入锅/成形三个瞬间） | 导出的 mrpack 能被 Prism/HMCL 打开；文件夹通道失败可完整回滚；波纹 ≥ 55 fps（Intel 集显）；`reduceMotion` 下有等价信息 |
-| **0.7** | RAG v1 | `src/rag/*`：语料→int8 索引→混合检索→点菜页的模组搜索；模型可选下载（不内嵌，见 §4.5）；评测集与 CI 指标 | **实测 nDCG@10 0.5568 vs BM25 0.0920**；稳态检索 ~50 ms；无模型时 hashing 降级可用；AppImage 仍 73 MB（模型不入包） |
-| **0.8** | UI 重构 | `qml2/` 全量替换（Order/Cook/Serve/Settings × 五状态）、组件库、`Motion.qml` 统一节奏、golden 测试、窗口 chrome（min/max/双击/Snap） | 旧 `qml/` 删除；四视图 golden 全绿；键盘全流程可操作；动效只在三个决定性瞬间出现 |
-| **0.9** | 包生态 | 导入 `.mrpack`/CF zip/FTB 包；启动器实例发现（`.minecraft`/Prism/HMCL/PCL）；**自包含导出**（`SelfContainedRenderer` + 许可闸门 §3.5 + NOTICE + `redistribution.json`，导入端也校验） | 三种格式导入成功率 ≥ 95%（各 10 个真实包）；自包含包在另一台机器上脱离网络可启动；禁止再分发的 mod 在 UI 上被拦下且有解释 |
-| **1.0** | 发行 | 签名/图标/多语言（zh/en，Qt Linguist）、性能预算、文档与迁移指南、Flatpak 真机验证 | 启动 < 1 s、点菜首屏 < 300 ms、内存 < 200 MB；三平台安装包齐 |
-
-**依赖关系**：0.5（地基+主题）→ 0.6（上菜）与 0.7（RAG）**可并行** → 0.8（UI）依赖前两者定型 →
-0.9 依赖 0.6。**注**：0.6 的上菜页先用 `qml2` 的雏形实现（ServeView + RippleCanvas），0.8 再统一到
-完整组件库——不然水波特效要写两遍。
-
-**不做什么**（明确划掉，防止范围蔓延）：不内置 Java 运行时安装、不做 Mojang 账号登录、不自建
-mod 托管/CDN、不做 Forge/NeoForge 安装器集成（要起 JVM，单独立项）、不做 macOS 的 GUI 打磨、
-不做壁纸取色（C 方案推迟到 1.1）。
+阶段表已迁移到 [`plan.md`](plan.md) 的“单一阶段规划表”，本文不再维护阶段范围/出口状态。
+设计上的依赖关系与“不做什么”也已随表迁移。
 
 ---
 
@@ -360,22 +350,14 @@ mod 托管/CDN、不做 Forge/NeoForge 安装器集成（要起 JVM，单独立�
 | 再分发许可 | 自包含包有法律风险 | §3.5 闸门：白名单自动通过、copyleft 需确认、`LicenseRef-*` 默认拒绝；NOTICE + `redistribution.json` 可追溯；导入端二次校验 |
 | RAG 包体 | 安装包 73 → ~185 MB | int8 量化（向量 19 MB 而非 77 MB）+ 文本/ FTS 压缩；出口设 ≤200 MB 硬线，超了就砍摘录文本只留短描述 |
 | 水波特效在软件渲染/集显上掉帧 | 0.6 出口不达标 | 三条降级路径（Software API / 帧时监控 / reduceMotion），出口前必须在 Intel 集显上测 |
-| UI 重构范围蔓延 | 0.8 无限延期 | 先定 `ui-spec-1.0.md` 与四个视图（Order/Cook/Serve/Settings）的验收清单，新增视图一律进 1.1 |
+| UI 重构范围蔓延 | 0.8 无限延期 | 先定 `ui-spec-1.0.md` 与四个视图（Order/Cook/Serve/Settings）的验收清单，新增视图一律进后续阶段 |
 | 三平台 CI 无真机 GPU | offscreen 只能验渲染逻辑 | CI 只跑离屏 + golden；真机 GPU 冒烟在发布前手动跑 |
 
 ---
 
-## 7. 工时估算（一人，按工作日）
+## 7. 原始工时估算（历史）
 
-| 阶段 | 估算 | 备注 |
-|---|---|---|
-| 0.5 平台层 + Windows 修复 + **色板 B** + CI | 13–15 天 | HCT 生成与对比度门禁占 4–5 天，CI 首次配置 2 天 |
-| 0.6 PackModel + 两个出口 + 上菜页 + 动效 v1 | 12–15 天 | 事务化安装/回滚与 shader 各占一半 |
-| 0.7 RAG v1 | 16–21 天 | 语料/评测集占一半，量化 + 打包 +1 天 |
-| 0.8 UI 重构 | 15–18 天 | 组件库 + golden 测试 |
-| 0.9 包生态 + 导入 + **自包含导出** | 10–13 天 | 许可闸门 2 天，真实包兼容性测试不可压缩 |
-| 1.0 打磨 + 三平台发布 | 8–10 天 | 签名/文档/多语言 |
-| 合计 | **74–92 天** | 不含 Forge/NeoForge 安装器 |
+原始估算 74–92 天（一人）仅作设计档案留存；阶段与状态见 [`plan.md`](plan.md)。
 
 ---
 
@@ -383,10 +365,16 @@ mod 托管/CDN、不做 Forge/NeoForge 安装器集成（要起 JVM，单独立�
 
 | # | 决议 | 落点 |
 |---|---|---|
-| 1 | 色板 **B 方案**，A 为运行时回退，C 推迟到 1.1 | §1.3，0.5 |
+| 1 | 色板 **B 方案**，A 为运行时回退，C 推迟（未排期） | §1.3，0.5 |
 | 2 | 产出界面 **点菜 / 烹饪 / 上菜** 三段式，上菜页两出口平权 | §2.2、§3.2，0.6 |
 | 3 | UI 与动效语言由本方案设计，节奏常量集中 `Motion.qml` | §2.4，0.6/0.8 |
-| 4 | **RAG 嵌入模型内嵌** + 种子索引 int8 内置，首启零下载 | §4.2、§4.5，0.7 |
+| 4 | RAG 模型**可选下载**（原“内嵌 + 种子索引”决议撤销：模型 118 MB + tokenizer 17 MB）；索引按需构建 | §4.2、§4.5，0.7 |
 | 5 | **允许自包含包**，但必须过许可闸门（默认拒绝 + NOTICE + 可追溯） | §3.5，0.9 |
 
-无待决项。下一步是把 0.5 拆成可执行清单（平台层接口冻结 → Windows 修复 → 色板 B → CI 门禁）。
+无待决项。阶段顺序、范围与状态见 [`plan.md`](plan.md)。
+
+---
+
+## 9. 状态口径
+
+阶段与能力状态只在 [`plan.md`](plan.md) 维护；本文的历史计划不构成交付声明。

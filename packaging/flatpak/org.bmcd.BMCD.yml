@@ -35,7 +35,16 @@ modules:
     config-opts:
       - -DCMAKE_BUILD_TYPE=Release
     sources:
-      # BMCD is not a git repository yet, so the manifest consumes the checkout
-      # directly. Switch to `type: git` once the project lives in a repo.
-      - type: dir
-        path: ../..
+      # Reproducible release source: a full commit from the public repository,
+      # not the working tree. build-flatpak.sh rewrites this commit to the
+      # checkout's HEAD before a local build; release CI checks that HEAD matches
+      # the manifest. Update this value when tagging a release.
+      - type: git
+        url: https://github.com/ByeMinecraftDownloader/BMCD.git
+        commit: a7302d58d1fe71b2dd8d64f3b3e320545b6ad6d7
+        skip:
+          - build
+          - dist
+          - .tools
+          - .git
+          - tests/pack-corpus

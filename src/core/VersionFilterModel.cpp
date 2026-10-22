@@ -12,6 +12,15 @@ VersionFilterModel::VersionFilterModel(QObject *parent)
     connect(this, &QAbstractItemModel::layoutChanged, this, notifyCount);
 }
 
+int VersionFilterModel::indexOfVersion(const QString &versionId) const
+{
+    for (int row = 0; row < rowCount(); ++row) {
+        if (index(row, 0).data(VersionListModel::IdRole).toString() == versionId)
+            return row;
+    }
+    return -1;
+}
+
 void VersionFilterModel::setSearchText(const QString &text)
 {
     if (m_searchText == text)

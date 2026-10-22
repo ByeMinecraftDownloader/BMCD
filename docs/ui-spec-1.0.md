@@ -1,8 +1,8 @@
 # BMCD 1.0 界面规格（1.0 实现版）
 
-本文记录 **已经落地** 的界面与交互，不是愿望清单。凡标「冻结」的部分（`qml/` 目录下的
-v1 界面）在 1.0 已移除；`qml2/`（QML 模块 `BMCD.UI`）是唯一界面
-切换，默认 v2。
+本文记录 **已经落地** 的 `qml2/` 界面与交互，不是愿望清单。1.0 只有 `qml2/`
+（QML 模块 `BMCD.UI`），v1 单文件界面已删除；未实现能力集中在 §9，能力状态与术语以
+[`plan.md`](plan.md) 为准。
 
 - 视觉基准：`docs/preview-{order,cook,serve,settings}.png`（1120×760，
   `QT_QPA_PLATFORM=offscreen` 实拍；`--target /tmp/BMCD-preview` 避免写入本机路径）
@@ -13,17 +13,19 @@ v1 界面）在 1.0 已移除；`qml2/`（QML 模块 `BMCD.UI`）是唯一界面
 
 | 层 | 用户动作 | 界面 | 后端 |
 |---|---|---|---|
-| 点菜 Order | 选版本、「挑模组」 | `OrderView.qml` | `VersionService` / `VersionDetail` / `InstalledVersions` |
+| 点菜 Order | 选游戏版本、看版本详情 | `OrderView.qml` | `VersionService` / `VersionDetail` / `InstalledVersions` |
 | 烹饪 Cook | 下载、暂停、看进度 | `CookView.qml` | `DownloadTask`（并发、分块、sha1 校验） |
 | 上菜 Serve | 出菜到文件夹 / 整合包 | `ServeView.qml` | `PackController` → `Deployer` / `Renderers` / `LicenseGate` |
-| 设置 Settings | 看路径、版本、色板模式、检索索引 | `SettingsView.qml` | `platform::Paths` / `Palette` / `RagController` |
+| 设置 Settings | 看路径、版本、色板模式 | `SettingsView.qml` | `platform::Paths` / `Palette` |
 
 左侧 `NavRail` 四项一一对应，`Ctrl+1..4` 直接跳转。四个视图由 `Loader.active` 切换，
 同一时刻只加载一个；页面状态放在 `VersionDetail` / `PackController` 等单例里，切页不丢。
 
-点菜页搜索框下方有一行**检索建议**（`RagController.suggest`，260 ms 防抖，最多 3 条，
-显示「相关：标题 — 片段」）。建议只做提示，不改变列表过滤；索引不存在时静默隐藏，
-设置页显示「未建立（bmcd --rag-build）」。
+点菜页当前搜索框只搜版本号/类型；1.1 将接入**基础查表**（本地别名/分类表 + Modrinth
+名称/分类查询，按 loader/版本过滤），不加载向量模型、不显示索引/相关度，也没有 RAG 开关。
+查询无结果时给“换关键词/检查 loader 或版本”的可操作提示，不假装语义理解。
+
+点菜页的模组勾选与菜篮见 `plan.md` §1.1；当前没有逐文件选择，也没有 RAG 推荐卡片。
 
 ## 2. Design token
 
@@ -82,12 +84,13 @@ v1 界面）在 1.0 已移除；`qml2/`（QML 模块 `BMCD.UI`）是唯一界面
 
 ## 5. 视图状态机
 
-`OrderView` 的 `state` 是显式五态，便于测试与文案：
+`OrderView` 用 `phase` 表示显式状态（QML `Item` 自带 `state` 属性，未限定绑定会被内建
+空字符串遮蔽，所以不叫 `state`）：
 
 ```
 0 empty    无版本 / 搜索无结果
 1 loading  拉取版本清单
-2 partial  清单已入但详情未取（0.7 起用于模组列表流式加载）
+2 partial  预留：清单已入但详情未取；当前实现自动选中首项，只产生 0/1/3/4
 3 error    VersionService.error 非空（文案 + 重试）
 4 success  列表可用
 ```
@@ -103,7 +106,9 @@ ready --serve()--> working(busy/taskDone/taskTotal) --> done | error
 ready --exportPack(mrpack|ftb|self)--> working --> done(resultPath)
 ```
 
-`licenceDenied` 非空时「自包含包」按钮禁用，需逐文件 `confirm(path)`（对话框内列出被拒文件）。
+`licenceDeniedGroups` 非空时「自包含包」按钮禁用；闸门按父级模组聚合成
+`licenceGroups`，点一次「已获授权」调用 `confirmGroup(groupId)` 覆盖该模组全部文件。
+普通版本的 client/lib/asset 由启动器安装、不进入自包含包，不计入闸门。
 
 ## 6. 键盘与可访问性
 
@@ -123,7 +128,7 @@ ready --exportPack(mrpack|ftb|self)--> working --> done(resultPath)
 
 ```bash
 QT_QPA_PLATFORM=offscreen MC_SCREENSHOT=/tmp/ui.png MC_SCREENSHOT_DELAY=7000 \
-  ./build/bmcd --ui=v2
+  ./build/bmcd
 ```
 
 判据：尺寸 1120×760、左上角背景 `(14,20,21)`、颜色数 > 1000、`MC_LOG` 中无
@@ -147,5 +152,8 @@ QT_QPA_PLATFORM=offscreen MC_SCREENSHOT=/tmp/ui.png MC_SCREENSHOT_DELAY=7000 \
 
 - 无最小化到托盘、无系统主题实时跟随（只在启动时读一次，`Palette.reload()` 可手动触发）。
 - 无高对比度模式；导航、窗口按钮、主操作按钮已接 `Accessible.name/role`，其余控件未系统化。
-- 0.7 的模组列表、RAG 搜索框、「推荐」卡片只留了版位（`OrderView` 右栏 + `SettingsView`
-  的 RAG 占位）。
+- 模组勾选、菜篮、依赖解析：未完成（1.1）；基础查表检索先接入，RAG 不在本轮。
+- RAG 向量知识库、QueryPlan、语义重排与开关：延后到 1.6；当前没有 RAG 建议/推荐卡片，
+  `SettingsView` 不展示索引状态。
+- 自包含包（A 方案，目标机已有同版本原版）在离线机器导入/部署，mrpack/CF/FTB 各 20 个真实包：未执行。
+- macOS 发行本轮暂缓；Flatpak、Windows 真机：未交付（见 `plan.md`）。

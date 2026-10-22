@@ -18,6 +18,36 @@ Window {
     property bool downloadsRunning: VersionDetail.downloadState === "running"
                                          || VersionDetail.downloadState === "paused"
 
+    // MC_AUTOSTART is the screenshot/deep-link helper: load the plan for the
+    // preselected version even when the window opens on cook/serve directly.
+    Component.onCompleted: {
+        if (typeof autoStartDownload !== "undefined" && autoStartDownload
+                && typeof initialVersion !== "undefined" && initialVersion.length > 0
+                && VersionDetail.versionId !== initialVersion)
+            VersionDetail.select(initialVersion, VersionService.urlFor(initialVersion));
+    }
+
+    // Plain versions are cooked by VersionDetail into downloads/versions/<id>.
+    // When we enter 出餐 after that download, rebuild the plan against that
+    // exact tree instead of PackController's private cooking directory.
+    function ensureDownloadedPlan() {
+        if (VersionDetail.state !== "ready" || VersionDetail.downloadState !== "done")
+            return false;
+        // A mods-only pack has no vanilla files, so it must not be replaced by
+        // the version download that cooked alongside it.
+        if (PackController.fileCount > 0 && !PackController.hasGameFiles)
+            return true;
+        if (PackController.fileCount > 0
+                && PackController.versionId === VersionDetail.versionId
+                && PackController.adopted
+                && PackController.sourceRoot === VersionDetail.targetDir)
+            return true;
+        PackController.prepareDownloaded(VersionDetail.versionId,
+                                         VersionService.urlFor(VersionDetail.versionId),
+                                         VersionDetail.targetDir);
+        return true;
+    }
+
     Column {
         anchors.fill: parent
 
@@ -39,7 +69,7 @@ Window {
             NavRail {
                 id: rail
                 current: root.section
-                onSelect: root.section = index
+                onSelect: function(index) { root.section = index }
             }
 
             Item {
@@ -58,24 +88,38 @@ Window {
                     anchors.fill: parent
                     active: root.section === 0
                     source: "views/OrderView.qml"
-                    onLoaded: item.openServe.connect(function() {
-                        root.section = 2;
-                        Qt.callLater(function() {
-                            if (PackController.fileCount === 0 && VersionDetail.state === "ready")
-                                PackController.prepare(VersionDetail.versionId,
-                                                       VersionService.urlFor(VersionDetail.versionId));
-                        });
-                    })
+                    onLoaded: {
+                        item.openCook.connect(function() { root.section = 1; })
+                        item.openSettings.connect(function() { root.section = 3; })
+                        item.openServe.connect(function() {
+                            root.section = 2;
+                            Qt.callLater(function() {
+                                if (root.ensureDownloadedPlan())
+                                    return;
+                                if (PackController.fileCount === 0 && VersionDetail.state === "ready")
+                                    PackController.prepare(VersionDetail.versionId,
+                                                           VersionService.urlFor(VersionDetail.versionId));
+                            });
+                        })
+                    }
                 }
                 Loader {
                     anchors.fill: parent
                     active: root.section === 1
                     source: "views/CookView.qml"
+                    onLoaded: {
+                        item.openOrder.connect(function() { root.section = 0; })
+                        item.openServe.connect(function() {
+                            root.section = 2;
+                            Qt.callLater(function() { root.ensureDownloadedPlan(); });
+                        })
+                    }
                 }
                 Loader {
                     anchors.fill: parent
                     active: root.section === 2
                     source: "views/ServeView.qml"
+                    onLoaded: item.openOrder.connect(function() { root.section = 0; })
                 }
                 Loader {
                     anchors.fill: parent

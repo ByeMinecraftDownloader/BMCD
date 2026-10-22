@@ -14,12 +14,15 @@ QJsonObject fileToJson(const PackFile &file)
         {QStringLiteral("path"), file.path},
         {QStringLiteral("url"), file.url},
         {QStringLiteral("sha1"), file.sha1},
+        {QStringLiteral("sha256"), file.sha256},
         {QStringLiteral("sha512"), file.sha512},
         {QStringLiteral("size"), double(file.size)},
         {QStringLiteral("kind"), file.kind},
         {QStringLiteral("optional"), file.optional},
         {QStringLiteral("clientSide"), file.clientSide},
         {QStringLiteral("serverSide"), file.serverSide},
+        {QStringLiteral("selected"), file.selected},
+        {QStringLiteral("enabled"), file.enabled},
     };
     if (!file.licenseId.isEmpty())
         object.insert(QStringLiteral("licenseId"), file.licenseId);
@@ -33,6 +36,8 @@ QJsonObject fileToJson(const PackFile &file)
         object.insert(QStringLiteral("author"), file.author);
     if (!file.projectId.isEmpty())
         object.insert(QStringLiteral("projectId"), file.projectId);
+    if (!file.projectName.isEmpty())
+        object.insert(QStringLiteral("projectName"), file.projectName);
     if (!file.fileId.isEmpty())
         object.insert(QStringLiteral("fileId"), file.fileId);
     return object;
@@ -44,18 +49,22 @@ PackFile fileFromJson(const QJsonObject &object)
     file.path = object.value(QStringLiteral("path")).toString();
     file.url = object.value(QStringLiteral("url")).toString();
     file.sha1 = object.value(QStringLiteral("sha1")).toString().toLower();
+    file.sha256 = object.value(QStringLiteral("sha256")).toString().toLower();
     file.sha512 = object.value(QStringLiteral("sha512")).toString().toLower();
     file.size = qint64(object.value(QStringLiteral("size")).toDouble());
     file.kind = object.value(QStringLiteral("kind")).toString(QStringLiteral("mod"));
     file.optional = object.value(QStringLiteral("optional")).toBool(false);
     file.clientSide = object.value(QStringLiteral("clientSide")).toBool(true);
     file.serverSide = object.value(QStringLiteral("serverSide")).toBool(true);
+    file.selected = object.value(QStringLiteral("selected")).toBool(true);
+    file.enabled = object.value(QStringLiteral("enabled")).toBool(true);
     file.licenseId = object.value(QStringLiteral("licenseId")).toString();
     file.licenseName = object.value(QStringLiteral("licenseName")).toString();
     file.licenseUrl = object.value(QStringLiteral("licenseUrl")).toString();
     file.sourceUrl = object.value(QStringLiteral("sourceUrl")).toString();
     file.author = object.value(QStringLiteral("author")).toString();
     file.projectId = object.value(QStringLiteral("projectId")).toString();
+    file.projectName = object.value(QStringLiteral("projectName")).toString();
     file.fileId = object.value(QStringLiteral("fileId")).toString();
     return file;
 }
@@ -130,10 +139,12 @@ bool Pack::isValid(QString *error) const
     for (const PackFile &file : files) {
         if (!isSafeRelativePath(file.path))
             return fail(QStringLiteral("不安全的路径：%1").arg(file.path));
-        if (seen.contains(file.path))
-            return fail(QStringLiteral("重复路径：%1").arg(file.path));
-        seen.insert(file.path);
-        if (file.sha1.isEmpty() && file.sha512.isEmpty() && !file.url.isEmpty())
+        if (file.selected && file.enabled) {
+            if (seen.contains(file.path))
+                return fail(QStringLiteral("重复路径：%1").arg(file.path));
+            seen.insert(file.path);
+        }
+        if (file.sha1.isEmpty() && file.sha256.isEmpty() && file.sha512.isEmpty() && !file.url.isEmpty())
             return fail(QStringLiteral("%1 缺少校验值").arg(file.path));
     }
     for (const QString &path : overrides) {
@@ -149,8 +160,10 @@ bool Pack::isValid(QString *error) const
 qint64 Pack::totalBytes() const
 {
     qint64 total = 0;
-    for (const PackFile &file : files)
-        total += file.size;
+    for (const PackFile &file : files) {
+        if (file.selected && file.enabled)
+            total += file.size;
+    }
     if (!overridesDir.isEmpty()) {
         for (const QString &path : overrides)
             total += QFileInfo(QDir(overridesDir).filePath(path)).size();
@@ -160,13 +173,20 @@ qint64 Pack::totalBytes() const
 
 int Pack::fileCount() const
 {
-    return int(files.size() + overrides.size());
+    int count = int(overrides.size());
+    for (const PackFile &file : files) {
+        if (file.selected && file.enabled)
+            ++count;
+    }
+    return count;
 }
 
 QVector<PackFile> Pack::contentFiles() const
 {
     QVector<PackFile> content;
     for (const PackFile &file : files) {
+        if (!file.selected || !file.enabled)
+            continue;
         if (file.kind == QLatin1String("mod") || file.kind == QLatin1String("config")
             || file.kind == QLatin1String("resource") || file.kind == QLatin1String("shader")
             || file.kind == QLatin1String("script"))

@@ -1,0 +1,33 @@
+# Maintainer: BMCD maintainers <maintainers@bmcd.invalid>
+# Built by packaging/arch/build-package.sh in release CI.  The source archive
+# is created from the exact tag checkout, so `sha256sums` is filled in there.
+pkgname=bmcd
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='Minecraft resource downloader with launcher setup and pack support'
+arch=('x86_64')
+url='https://github.com/ByeMinecraftDownloader/BMCD'
+license=('MIT')
+depends=('qt6-base' 'qt6-declarative' 'qt6-svg' 'hicolor-icon-theme')
+makedepends=('cmake' 'ninja')
+source=("bmcd-$pkgver.tar.gz")
+sha256sums=('SKIP')
+options=('!debug')
+
+build() {
+    cd "$srcdir/$pkgname-$pkgver"
+    cmake -S . -B build -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr
+    cmake --build build
+}
+
+check() {
+    cd "$srcdir/$pkgname-$pkgver"
+    ctest --test-dir build --output-on-failure
+}
+
+package() {
+    cd "$srcdir/$pkgname-$pkgver"
+    DESTDIR="$pkgdir" cmake --install build
+}

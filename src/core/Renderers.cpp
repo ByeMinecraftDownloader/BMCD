@@ -73,6 +73,8 @@ RenderResult renderMrpack(const Pack &pack, const RenderOptions &options)
                         {QStringLiteral("server"), file.serverSide ? QStringLiteral("required")
                                                                   : QStringLiteral("unsupported")}};
         QJsonObject hashes{{QStringLiteral("sha1"), file.sha1}};
+        if (!file.sha256.isEmpty())
+            hashes.insert(QStringLiteral("sha256"), file.sha256);
         if (!file.sha512.isEmpty())
             hashes.insert(QStringLiteral("sha512"), file.sha512);
         files.append(QJsonObject{

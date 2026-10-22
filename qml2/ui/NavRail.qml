@@ -13,9 +13,9 @@ Item {
     implicitHeight: 320
 
     readonly property var items: [
-        { label: qsTr("版本"), icon: "versions" },
-        { label: qsTr("队列"), icon: "queue" },
-        { label: qsTr("导出"), icon: "serve" },
+        { label: qsTr("点菜"), icon: "versions" },
+        { label: qsTr("烹饪"), icon: "queue" },
+        { label: qsTr("出餐"), icon: "serve" },
         { label: qsTr("设置"), icon: "settings" }
     ]
 
@@ -45,8 +45,8 @@ Item {
                 Rectangle {
                     id: pill
                     anchors.centerIn: parent
-                    width: 44
-                    height: 40
+                    width: 48
+                    height: 46
                     radius: Tokens.radiusLg
                     color: index === rail.current ? Tokens.primaryContainer : "transparent"
                     Behavior on color { ColorAnimation { duration: Motion.micro } }
@@ -54,7 +54,7 @@ Item {
 
                 Column {
                     anchors.centerIn: parent
-                    spacing: 2
+                    spacing: 3
                     Icon {
                         anchors.horizontalCenter: parent.horizontalCenter
                         name: modelData.icon

@@ -21,6 +21,9 @@ QtObject {
     readonly property color primaryContainer: Bmcd.Palette.primaryContainer
     readonly property color primaryContainerInk: Bmcd.Palette.onPrimaryContainer
     readonly property color outline: Bmcd.Palette.outline
+    // A low-contrast edge for panels: visible as a boundary without turning
+    // every card into a boxed widget.
+    readonly property color hairline: Qt.rgba(outline.r, outline.g, outline.b, 0.45)
     readonly property color danger: Bmcd.Palette.error
     readonly property color warning: Bmcd.Palette.warning
     readonly property color success: Bmcd.Palette.success

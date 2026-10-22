@@ -13,12 +13,15 @@ struct PackFile
     QString path;          // relative to the game directory, e.g. "mods/sodium.jar"
     QString url;
     QString sha1;
+    QString sha256;
     QString sha512;
     qint64 size = 0;
     QString kind;          // mod | config | resource | shader | script | lib
     bool optional = false;
     bool clientSide = true;
     bool serverSide = true;
+    bool selected = true;   // user picked this file for the plan
+    bool enabled = true;    // effective after dependency/side resolution
 
     // Licence metadata (from the project API) — drives the self-contained gate.
     QString licenseId;
@@ -27,6 +30,7 @@ struct PackFile
     QString sourceUrl;
     QString author;
     QString projectId;
+    QString projectName;   // display title; used to group licence confirmations
     QString fileId;
 };
 

@@ -67,6 +67,7 @@ qt_add_qml_module(bmcd_ui
         qml2/Tokens.qml
         qml2/ui/Icon.qml
         qml2/ui/NavRail.qml
+        qml2/ui/ModPicker.qml
         qml2/ui/PageHeader.qml
         qml2/ui/SectionLabel.qml
         qml2/ui/SettingRow.qml
@@ -76,6 +77,7 @@ qt_add_qml_module(bmcd_ui
         qml2/ui/controls/CircleProgress.qml
         qml2/ui/controls/ConfirmDialog.qml
         qml2/ui/controls/Panel.qml
+        qml2/ui/controls/ProgressBar.qml
         qml2/ui/controls/RippleCanvas.qml
         qml2/ui/controls/SearchField.qml
         qml2/ui/controls/ToastBar.qml
@@ -89,6 +91,12 @@ target_link_libraries(bmcd_ui PRIVATE Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick)
 # UI translations. Chinese is the source language; the compiled English catalog
 # is committed so every platform ships it without needing Qt Linguist at build
 # time. Refresh it with lrelease after editing i18n/bmcd_en.ts.
+qt_add_resources(bmcd "modaliases"
+    PREFIX "/data"
+    BASE data
+    FILES data/mod-aliases.json
+)
+
 qt_add_resources(bmcd "i18n"
     PREFIX "/i18n"
     BASE i18n
@@ -118,6 +126,7 @@ qt_add_qml_module(bmcd
         src/platform/PlatformInfo.cpp
         src/platform/Console.h
         src/platform/Console.cpp
+        src/platform/Process.h
         src/core/VersionListModel.h
         src/core/VersionListModel.cpp
         src/core/VersionFilterModel.h
@@ -129,8 +138,20 @@ qt_add_qml_module(bmcd
         src/core/PlanParser.cpp
         src/core/DownloadTask.h
         src/core/DownloadTask.cpp
+        src/core/DownloadSources.h
+        src/core/DownloadSources.cpp
         src/core/VersionDetail.h
         src/core/VersionDetail.cpp
+        src/core/AppSettings.h
+        src/core/AppSettings.cpp
+        src/core/JavaLocator.h
+        src/core/JavaLocator.cpp
+        src/core/ProfileMerger.h
+        src/core/ProfileMerger.cpp
+        src/core/LoaderInstaller.h
+        src/core/LoaderInstaller.cpp
+        src/core/CookSession.h
+        src/core/CookSession.cpp
         src/core/InstalledVersions.h
         src/core/InstalledVersions.cpp
         src/core/Pack.h
@@ -165,6 +186,13 @@ qt_add_qml_module(bmcd
         src/rag/RagController.cpp
         src/core/PackController.h
         src/core/PackController.cpp
+        src/mods/ModResolver.h
+        src/mods/ModResolver.cpp
+        src/mods/ModAliases.cpp
+        src/mods/ModrinthApi.h
+        src/mods/ModrinthApi.cpp
+        src/mods/ModsController.h
+        src/mods/ModsController.cpp
     RESOURCE_PREFIX /qt/qml
 )
 
@@ -176,6 +204,7 @@ target_include_directories(bmcd PRIVATE
     src/platform
     src/rag
     src/core
+    src/mods
 )
 
 target_link_libraries(bmcd PRIVATE
@@ -232,6 +261,9 @@ install(FILES packaging/bmcd.svg
 install(FILES packaging/flatpak/org.bmcd.BMCD.metainfo.xml
     DESTINATION share/metainfo
 )
+install(FILES LICENSE
+    DESTINATION share/licenses/bmcd
+)
 
 # --- tests ------------------------------------------------------------------
 # Unit tests are plain executables (not qt_add_test) so they build with the
@@ -263,6 +295,7 @@ add_test(NAME theme COMMAND tst_theme)
 add_executable(tst_pack
     tests/tst_pack.cpp
     src/core/Pack.cpp
+    src/core/PlanParser.cpp
     src/core/ZipWriter.cpp
     src/core/ZipReader.cpp
     src/core/PackImporter.cpp
@@ -276,6 +309,91 @@ add_executable(tst_pack
 target_include_directories(tst_pack PRIVATE src src/core src/platform)
 target_link_libraries(tst_pack PRIVATE Qt6::Core Qt6::Network Qt6::Test ZLIB::ZLIB)
 add_test(NAME pack COMMAND tst_pack)
+
+add_executable(tst_mods
+    tests/tst_mods.cpp
+    src/mods/ModResolver.cpp
+    src/mods/ModAliases.cpp
+)
+target_include_directories(tst_mods PRIVATE src src/mods)
+target_link_libraries(tst_mods PRIVATE Qt6::Core Qt6::Test)
+add_test(NAME mods COMMAND tst_mods)
+
+add_executable(tst_javalocator
+    tests/tst_javalocator.cpp
+    src/core/JavaLocator.cpp
+    src/core/AppSettings.cpp
+    src/platform/FileOps.cpp
+    src/platform/Paths.cpp
+    src/platform/PlatformInfo.cpp
+    src/platform/Console.cpp
+)
+target_include_directories(tst_javalocator PRIVATE src)
+target_link_libraries(tst_javalocator PRIVATE Qt6::Core Qt6::Network Qt6::Test)
+add_test(NAME javalocator COMMAND tst_javalocator)
+
+add_executable(tst_profilemerger
+    tests/tst_profilemerger.cpp
+    src/core/ProfileMerger.cpp
+    src/platform/FileOps.cpp
+    src/platform/Paths.cpp
+)
+target_include_directories(tst_profilemerger PRIVATE src)
+target_link_libraries(tst_profilemerger PRIVATE Qt6::Core Qt6::Test)
+add_test(NAME profilemerger COMMAND tst_profilemerger)
+
+add_executable(tst_loaderinstaller
+    tests/tst_loaderinstaller.cpp
+    src/core/LoaderInstaller.cpp
+    src/core/ProfileMerger.cpp
+    src/core/AppSettings.cpp
+    src/platform/FileOps.cpp
+    src/platform/Paths.cpp
+    src/platform/PlatformInfo.cpp
+    src/platform/Console.cpp
+)
+target_include_directories(tst_loaderinstaller PRIVATE src)
+target_link_libraries(tst_loaderinstaller PRIVATE Qt6::Core Qt6::Network Qt6::Test)
+add_test(NAME loaderinstaller COMMAND tst_loaderinstaller)
+
+add_executable(tst_download
+    tests/tst_download.cpp
+    src/core/DownloadTask.cpp
+    src/core/DownloadSources.cpp
+    src/core/AppSettings.cpp
+    src/platform/FileOps.cpp
+    src/platform/Paths.cpp
+    src/platform/PlatformInfo.cpp
+    src/platform/Console.cpp
+)
+target_include_directories(tst_download PRIVATE src)
+target_link_libraries(tst_download PRIVATE Qt6::Core Qt6::Network Qt6::Test)
+add_test(NAME download COMMAND tst_download)
+
+add_executable(tst_packcontroller
+    tests/tst_packcontroller.cpp
+    src/core/PackController.cpp
+    src/core/DownloadTask.cpp
+    src/core/DownloadSources.cpp
+    src/core/AppSettings.cpp
+    src/core/Pack.cpp
+    src/core/PlanParser.cpp
+    src/core/ZipWriter.cpp
+    src/core/ZipReader.cpp
+    src/core/PackImporter.cpp
+    src/core/Instances.cpp
+    src/core/LicenseGate.cpp
+    src/core/Renderers.cpp
+    src/core/Deployer.cpp
+    src/platform/FileOps.cpp
+    src/platform/Paths.cpp
+    src/platform/PlatformInfo.cpp
+    src/platform/Console.cpp
+)
+target_include_directories(tst_packcontroller PRIVATE src src/core src/platform)
+target_link_libraries(tst_packcontroller PRIVATE
+    Qt6::Core Qt6::Network Qt6::Concurrent Qt6::Qml Qt6::Test ZLIB::ZLIB)
+add_test(NAME packcontroller COMMAND tst_packcontroller)
 
 add_executable(tst_rag
     tests/tst_rag.cpp

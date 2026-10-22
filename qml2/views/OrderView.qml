@@ -17,29 +17,97 @@ Item {
             return 0;                       // empty
         return 4;                           // success
     }
+    property string planFailure: ""
+    property string planHint: ""
+    property bool initialSelectionDone: false
+
+    function formatBytes(n) {
+        if (n < 1024) return n + " B";
+        if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+        if (n < 1024 * 1024 * 1024) return (n / (1024 * 1024)).toFixed(1) + " MB";
+        return (n / (1024 * 1024 * 1024)).toFixed(2) + " GB";
+    }
+
     readonly property var stateNames: [qsTr("空"), qsTr("读取中"), qsTr("部分"), qsTr("出错"), qsTr("就绪")]
 
     readonly property int listWidth: Math.min(460, Math.max(300, width * 0.38))
     readonly property int selectedIndex: versionList.currentIndex
     readonly property string selectedId: versionList.currentItem
                                          ? versionList.currentItem.versionId : ""
+    readonly property bool planLoaded: VersionDetail.versionId === selectedId
+                                       && VersionDetail.state === "ready"
+    readonly property bool planLoading: VersionDetail.state === "loading"
+
+    function selectInitialVersion() {
+        if (initialSelectionDone || typeof initialVersion === "undefined"
+                || initialVersion.length === 0)
+            return;
+        filtered.channel = "all";
+        const index = filtered.indexOfVersion(initialVersion);
+        if (index < 0)
+            return;
+        initialSelectionDone = true;
+        versionList.currentIndex = index;
+        versionList.positionViewAtIndex(index, ListView.Contain);
+        if (typeof autoStartDownload !== "undefined" && autoStartDownload)
+            VersionDetail.select(initialVersion, VersionService.urlFor(initialVersion));
+    }
+
+    Connections {
+        target: filtered
+        function onCountChanged() { view.selectInitialVersion(); }
+    }
+
+    onSelectedIdChanged: {
+        planFailure = "";
+        planHint = "";
+        if (CookSession.hasLoader) {
+            CookSession.loaderVersion = "";
+            CookSession.refreshLoaderVersions();
+        }
+        ModsController.setContext(CookSession.hasLoader ? CookSession.loaderType : "fabric", selectedId);
+    }
+
+    Connections {
+        target: ModsController
+        function onSelectedChanged() {
+            view.planHint = "";
+        }
+    }
 
     signal openServe()
+    signal openCook()
+    signal openSettings()
+
+    Connections {
+        target: CookSession
+        function onChanged() {
+            if (CookSession.hasLoader)
+                ModsController.setContext(CookSession.loaderType, view.selectedId);
+        }
+    }
+
+    ModPicker {
+        id: modPicker
+        gameVersion: view.selectedId
+        onPlanAccepted: function(json) {
+            view.planFailure = "";
+            if (!PackController.adoptPack(json)) {
+                view.planFailure = PackController.error;
+                return;
+            }
+            view.planHint = qsTr("备菜完成 · %1 个文件 · %2，点“去烹饪”确认下载")
+                            .arg(PackController.fileCount)
+                            .arg(view.formatBytes(PackController.totalBytes));
+            if (!CookSession.loaderSelectedForPlan && CookSession.requiredLoader.length > 0)
+                view.planHint = qsTr("这些配菜需要 %1 加载器：请在“加载器”里切到 %1。")
+                                .arg(CookSession.requiredLoader);
+        }
+    }
 
     VersionFilterModel {
         id: filtered
         sourceModel: VersionService.versions
-    }
-
-    property var suggestions: []
-
-    // Local knowledge index: soft hints under the search field, never blocking.
-    Timer {
-        id: ragTimer
-        interval: 260
-        onTriggered: view.suggestions = RagController.available
-                     ? RagController.suggest(search.text, 3)
-                     : []
     }
 
     Column {
@@ -48,8 +116,8 @@ Item {
 
         PageHeader {
             width: parent.width
-            title: qsTr("版本")
-            subtitle: qsTr("挑一个锅底；读取清单后就能下锅。")
+            title: qsTr("点菜")
+            subtitle: qsTr("先选锅底，再按需加配菜；菜篮满了就开火。")
         }
 
         Row {
@@ -66,16 +134,8 @@ Item {
             SearchField {
                 id: search
                 width: parent.width
-                label: qsTr("搜索版本（/ 聚焦）")
-                onTextChanged: {
-                    filtered.searchText = text;
-                    if (text.length >= 2)
-                        ragTimer.restart();
-                    else {
-                        ragTimer.stop();
-                        view.suggestions = [];
-                    }
-                }
+                label: qsTr("搜索版本")
+                onTextChanged: filtered.searchText = text
             }
 
             Row {
@@ -94,29 +154,6 @@ Item {
                 }
             }
 
-            Column {
-                width: parent.width
-                spacing: 2
-                visible: view.suggestions.length > 0
-                Repeater {
-                    model: view.suggestions
-                    delegate: Text {
-                        width: parent.width
-                        text: qsTr("相关：%1").arg(modelData)
-                        color: Tokens.textMuted
-                        elide: Text.ElideRight
-                        font.pixelSize: Tokens.fontSizeCaption
-                    }
-                }
-            }
-
-            Text {
-                width: parent.width
-                text: qsTr("%1 · %2 个版本").arg(view.stateNames[view.phase]).arg(filtered.count)
-                color: Tokens.textMuted
-                font.pixelSize: Tokens.fontSizeCaption
-            }
-
             ListView {
                 id: versionList
                 width: parent.width
@@ -130,14 +167,30 @@ Item {
                 delegate: Panel {
                     id: row
                     readonly property string versionId: model.id
+                    readonly property bool isCurrent: ListView.isCurrentItem
 
                     width: ListView.view.width
                     interactive: true
-                    selected: ListView.isCurrentItem
+                    selected: row.isCurrent
                     padding: Tokens.spacingMd
                     height: 58
+                    Accessible.role: Accessible.ListItem
+                    Accessible.name: row.versionId
+                    Accessible.selected: row.isCurrent
+
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.leftMargin: 6
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 3
+                        height: 26
+                        radius: 1.5
+                        color: Tokens.primary
+                        visible: row.isCurrent
+                    }
 
                     Column {
+                        width: parent.width - 30
                         anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: 3
@@ -145,7 +198,7 @@ Item {
                             text: row.versionId
                             color: Tokens.text
                             font.pixelSize: Tokens.fontSizeBody
-                            font.weight: ListView.isCurrentItem ? Font.DemiBold : Font.Normal
+                            font.weight: row.isCurrent ? Font.DemiBold : Font.Normal
                         }
                         Text {
                             text: (model.type === "release" ? qsTr("正式")
@@ -158,18 +211,20 @@ Item {
                         }
                     }
 
-                    AppButton {
+                    Icon {
                         anchors.right: parent.right
+                        anchors.rightMargin: 2
                         anchors.verticalCenter: parent.verticalCenter
-                        text: ListView.isCurrentItem ? qsTr("已选") : qsTr("选择")
-                        primary: ListView.isCurrentItem
-                        onClicked: {
-                            versionList.currentIndex = index;
-                            versionList.positionViewAtIndex(index, ListView.Contain);
-                        }
+                        name: "check"
+                        size: 16
+                        color: Tokens.primary
+                        visible: row.isCurrent
                     }
 
-                    TapHandler { onTapped: versionList.currentIndex = index }
+                    TapHandler {
+                        cursorShape: Qt.PointingHandCursor
+                        onTapped: versionList.currentIndex = index
+                    }
                 }
 
                 // stamp moment: pressing a card pushes it in and lets go
@@ -190,6 +245,9 @@ Item {
                 width: parent.width
                 spacing: Tokens.spacingLg
                 visible: view.phase === 4
+                // Without a plan this is the only content in the panel, so centre
+                // it; once the manifest is loaded the heading belongs at the top.
+                y: view.planLoaded ? 0 : Math.max(0, (parent.height - implicitHeight) / 2)
 
                 SectionLabel { text: qsTr("版本详情") }
 
@@ -203,12 +261,15 @@ Item {
                 }
                 Text {
                     width: parent.width
-                    text: qsTr("放进清单，下一步是把它端到哪里去。")
+                    text: view.planLoaded
+                          ? qsTr("放进清单，下一步是把它端到哪里去。")
+                          : qsTr("先读取这个版本的清单。")
                     color: Tokens.textVariant
                     font.pixelSize: Tokens.fontSizeBody
                 }
 
                 Row {
+                    visible: view.planLoaded
                     spacing: Tokens.spacingXl
                     Repeater {
                         model: [
@@ -238,13 +299,164 @@ Item {
                     }
                 }
 
-                Text {
+                Column {
                     width: parent.width
-                    visible: VersionDetail.error.length > 0 && VersionDetail.versionId === view.selectedId
-                    text: VersionDetail.error
-                    color: Tokens.danger
-                    wrapMode: Text.WordWrap
+                    spacing: Tokens.spacingSm
+                    visible: view.planLoaded
+
+                    SectionLabel { text: qsTr("加载器") }
+
+                    Row {
+                        width: parent.width
+                        spacing: Tokens.spacingSm
+
+                        ComboBox {
+                            id: loaderTypeBox
+                            width: 132
+                            model: [
+                                { key: "vanilla", label: qsTr("原版") },
+                                { key: "fabric", label: "Fabric" },
+                                { key: "quilt", label: "Quilt" },
+                                { key: "forge", label: "Forge" },
+                                { key: "neoforge", label: "NeoForge" }
+                            ]
+                            textRole: "label"
+                            currentIndex: {
+                                for (let i = 0; i < count; ++i) {
+                                    if (model[i].key === CookSession.loaderType)
+                                        return i;
+                                }
+                                return 0;
+                            }
+                            onActivated: CookSession.loaderType = model[currentIndex].key
+                        }
+
+                        TextField {
+                            id: loaderVersionField
+                            width: Math.max(110, parent.width - loaderTypeBox.width
+                                            - loaderVersionBox.width - Tokens.spacingSm * 2)
+                            text: CookSession.loaderVersion
+                            placeholderText: qsTr("版本，可手填")
+                            enabled: CookSession.hasLoader
+                            onEditingFinished: CookSession.loaderVersion = text.trim()
+                        }
+
+                        ComboBox {
+                            id: loaderVersionBox
+                            width: 126
+                            model: CookSession.loaderVersions
+                            textRole: "label"
+                            enabled: CookSession.hasLoader && CookSession.loaderVersions.length > 0
+                                     && !CookSession.loaderVersionsLoading
+                            displayText: CookSession.loaderVersionsLoading ? qsTr("读取中…")
+                                         : CookSession.loaderVersions.length > 0 ? qsTr("推荐")
+                                                                                 : qsTr("无推荐")
+                            onActivated: {
+                                if (index >= 0 && index < CookSession.loaderVersions.length)
+                                    CookSession.loaderVersion = CookSession.loaderVersions[index].version;
+                            }
+                        }
+                    }
+
+                    Text {
+                        width: parent.width
+                        visible: CookSession.requiredLoader.length > 0
+                                 && !CookSession.loaderSelectedForPlan
+                        text: qsTr("这个整合包需要 %1 加载器；请在上方切到 %1 再烹饪。")
+                              .arg(CookSession.requiredLoader)
+                        color: Tokens.warning
+                        font.pixelSize: Tokens.fontSizeCaption
+                        wrapMode: Text.WordWrap
+                    }
+
+                    Row {
+                        width: parent.width
+                        spacing: Tokens.spacingSm
+                        Text {
+                            width: parent.width - javaAction.width - Tokens.spacingSm
+                            text: CookSession.hasLoader
+                                  ? (CookSession.javaReady
+                                     ? qsTr("Java %1 · 将写入 %2").arg(CookSession.javaVersion)
+                                       .arg(CookSession.loaderProfileName)
+                                     : qsTr("未检测到 Java；安装加载器前请先在设置页选择 Java。"))
+                                  : qsTr("原版不需要安装加载器，模组步骤也会跳过。")
+                            color: CookSession.hasLoader && !CookSession.javaReady
+                                   ? Tokens.danger : Tokens.textMuted
+                            font.pixelSize: Tokens.fontSizeCaption
+                            wrapMode: Text.WordWrap
+                        }
+                        AppButton {
+                            id: javaAction
+                            text: qsTr("去设置")
+                            visible: CookSession.hasLoader && !CookSession.javaReady
+                            onClicked: view.openSettings()
+                        }
+                    }
+                    Text {
+                        width: parent.width
+                        visible: CookSession.loaderVersionsError.length > 0 && CookSession.hasLoader
+                        text: CookSession.loaderVersionsError + qsTr("（可手填版本）")
+                        color: Tokens.danger
+                        font.pixelSize: Tokens.fontSizeCaption
+                        wrapMode: Text.WordWrap
+                    }
+                }
+
+                Column {
+                    width: parent.width
+                    visible: !view.planLoaded
+                    spacing: Tokens.spacingMd
+
+                    Text {
+                        width: parent.width
+                        text: view.planLoading
+                              ? qsTr("正在读取版本清单…")
+                              : qsTr("读取清单后，这里会显示文件数、大小、Java 与素材统计。")
+                        color: view.planLoading ? Tokens.textVariant : Tokens.textMuted
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: Tokens.fontSizeCaption
+                    }
+                    Text {
+                        width: parent.width
+                        visible: VersionDetail.error.length > 0
+                        text: VersionDetail.error
+                        color: Tokens.danger
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: Tokens.fontSizeCaption
+                    }
+                    AppButton {
+                        text: view.planLoading ? qsTr("正在读取…") : qsTr("读取清单")
+                        iconName: "refresh"
+                        primary: true
+                        enabledByParent: !view.planLoading
+                        onClicked: VersionDetail.select(view.selectedId,
+                                                        VersionService.urlFor(view.selectedId))
+                    }
+                }
+            }
+
+            // Basket: the only thing "add mods" changes until the user asks for
+            // a plan. Keeping it above the divider leaves the bottom actions
+            // stable at every window size.
+            Row {
+                width: parent.width
+                height: 24
+                spacing: Tokens.spacingMd
+                visible: view.planLoaded && ModsController.selectedCount > 0
+
+                SectionLabel { text: qsTr("菜篮 · %1").arg(ModsController.selectedCount) }
+                Text {
+                    width: parent.width - 150
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: ModsController.selected.map(function(entry) { return entry.title }).join("、")
+                    color: Tokens.textMuted
                     font.pixelSize: Tokens.fontSizeCaption
+                    elide: Text.ElideRight
+                }
+                AppButton {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: qsTr("管理")
+                    onClicked: modPicker.openFor(view.selectedId)
                 }
             }
 
@@ -252,10 +464,35 @@ Item {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: detailActions.top
-                anchors.bottomMargin: Tokens.spacingLg
+                anchors.bottomMargin: view.planFailure.length > 0 ? 38 : Tokens.spacingLg
                 height: 1
-                color: Tokens.outline
-                visible: view.phase === 4
+                color: Tokens.hairline
+                visible: view.phase === 4 && view.planLoaded
+            }
+
+            Column {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: detailActions.top
+                anchors.bottomMargin: 8
+                spacing: 4
+
+                Text {
+                    width: parent.width
+                    text: view.planFailure
+                    color: Tokens.danger
+                    font.pixelSize: Tokens.fontSizeCaption
+                    elide: Text.ElideRight
+                    visible: view.planFailure.length > 0
+                }
+                Text {
+                    width: parent.width
+                    text: view.planHint
+                    color: Tokens.primary
+                    font.pixelSize: Tokens.fontSizeCaption
+                    elide: Text.ElideRight
+                    visible: view.planHint.length > 0
+                }
             }
 
             Flow {
@@ -264,27 +501,26 @@ Item {
                 anchors.left: parent.left
                 anchors.bottom: parent.bottom
                 spacing: Tokens.spacingMd
-                visible: view.phase === 4
+                visible: view.phase === 4 && view.planLoaded
 
                 AppButton {
-                    text: VersionDetail.versionId === view.selectedId
-                          && VersionDetail.state === "ready" ? qsTr("重新读取") : qsTr("读取清单")
-                    onClicked: VersionDetail.select(view.selectedId, VersionService.urlFor(view.selectedId))
-                }
-                AppButton {
-                    text: qsTr("下载（烹饪）")
+                    text: qsTr("去烹饪")
                     iconName: "download"
                     primary: true
-                    enabledByParent: VersionDetail.versionId === view.selectedId
-                                     && VersionDetail.state === "ready"
-                                     && VersionDetail.downloadState !== "running"
-                    onClicked: VersionDetail.startDownload()
+                    enabledByParent: CookSession.hasPlan && CookSession.loaderSelectedForPlan
+                    onClicked: view.openCook()
                 }
                 AppButton {
-                    text: qsTr("去导出")
+                    text: qsTr("添加配菜")
+                    iconName: "queue"
+                    visible: view.selectedId.length > 0
+                    enabledByParent: view.planLoaded
+                    onClicked: modPicker.openFor(view.selectedId)
+                }
+                AppButton {
+                    text: qsTr("去出餐")
                     iconName: "serve"
-                    enabledByParent: VersionDetail.versionId === view.selectedId
-                                     && VersionDetail.state === "ready"
+                    enabledByParent: CookSession.hasPlan
                     onClicked: view.openServe()
                 }
             }
@@ -335,8 +571,19 @@ Item {
         visible: running
     }
 
+    Connections {
+        target: CookSession
+        function onChanged() {
+            if (!loaderVersionField.activeFocus)
+                loaderVersionField.text = CookSession.loaderVersion;
+        }
+    }
+
     Component.onCompleted: {
+        selectInitialVersion();
         if (VersionService.versions.rowCount() === 0)
             VersionService.refresh();
+        if (CookSession.hasLoader)
+            CookSession.refreshLoaderVersions();
     }
 }

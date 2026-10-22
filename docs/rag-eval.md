@@ -1,5 +1,9 @@
 # RAG 检索评测（0.7 实测）
 
+**范围**：本文只证明 **0.7 检索后端**（语料→索引→混合排序）的历史指标，不证明产品级模组目录、
+搜索或选择。RAG 产品路径已延后到 [`plan.md`](plan.md) 的 1.6“模组向量知识库”；当前 1.1
+只做基础查表检索（名称/别名/分类，不加载向量模型）。本文数字不得当作 1.6 验收证据。
+
 本文记录 **已经跑出来的数字**，不是目标值。所有命令都在 Linux / Qt 6.12 / onnxruntime 1.29
 环境执行，模型为 `Xenova/multilingual-e5-small` int8（`model_quantized.onnx` 118 MB +
 `tokenizer.json` 17 MB，位于 `$MC_MODEL_DIR`，默认 `~/.cache/BMCD/bmcd/models/e5-small`）。
@@ -63,6 +67,10 @@ nDCG@10 bm25:  0.0920
 4. **中文 FTS 仍弱**：查询靠 e5 向量兜底；同义词表（roadmap §4.3 的 200 条）尚未实现，
    中文意图查询的召回上限受此限制；
 5. **索引增量更新未实现**：重建是整库重来（2.7–38.5 s），5 万项目时需要按 `updated` 做 delta。
+6. **语料规模是 100 项目 / 231 片段**：roadmap 的 5 万项目目录未构建；不能把本评测外推为
+   “5 万模组可检索”。
+7. **产品链路未评测**：`RagController.suggest()` 只返回 `QStringList`，没有 project/file id、
+   没有 loader/版本过滤；不存在“提示→候选→勾选→下载”的端到端用例。
 
 ## 5. 复现
 
