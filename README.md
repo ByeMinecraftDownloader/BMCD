@@ -26,7 +26,7 @@
 </p>
 
 > [!NOTE]
-> 当前版本 **0.1.0**，处于小范围内测阶段，CLI、配置和整合包导出格式仍可能调整。
+> 当前版本 **0.1.1**，处于小范围内测阶段，CLI、配置和整合包导出格式仍可能调整。
 > 遇到问题或有建议，欢迎到 [Issues](https://github.com/ByeMinecraftDownloader/BMCD/issues) 反馈。
 
 BMCD 是一个用 **Qt 6 / Qt Quick** 写的 Minecraft 资源下载与整合包工具。它从官方版本清单读取游戏文件，支持 Fabric、Quilt、Forge、NeoForge 加载器，也能导入 Modrinth、CurseForge、FTB 整合包，完成校验、部署、备份和导出。
