@@ -63,7 +63,8 @@ install -m 644 "$APPDIR/usr/share/icons/hicolor/512x512/apps/org.bmcd.BMCD.png" 
     "$STAGE/usr/share/icons/hicolor/512x512/apps/org.bmcd.BMCD.png"
 install -m 644 "$ROOT/packaging/flatpak/org.bmcd.BMCD.metainfo.xml" \
     "$STAGE/usr/share/metainfo/org.bmcd.BMCD.metainfo.xml"
-install -m 644 "$ROOT/LICENSE" "$STAGE/usr/share/doc/bmcd/copyright"
+install -m 644 "$ROOT/packaging/debian/copyright" \
+    "$STAGE/usr/share/doc/bmcd/copyright"
 
 # dpkg's md5sums are relative to the package root and omit symlinks.
 (
