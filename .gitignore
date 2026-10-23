@@ -20,3 +20,6 @@ tokens.json
 .vscode/
 *.user
 .DS_Store
+
+# Agent / Vibe
+CODE_REVIEW.md

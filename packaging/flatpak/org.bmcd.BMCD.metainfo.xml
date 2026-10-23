@@ -4,7 +4,7 @@
   <name>BMCD</name>
   <summary>Minecraft resource downloader</summary>
   <metadata_license>MIT</metadata_license>
-  <project_license>MIT</project_license>
+  <project_license>GPL-3.0-or-later</project_license>
   <description>
     <p>
       BMCD (Bye!MinecraftDownloader) fetches Minecraft game files: it reads the

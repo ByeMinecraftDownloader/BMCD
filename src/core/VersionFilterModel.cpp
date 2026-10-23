@@ -26,7 +26,7 @@ void VersionFilterModel::setSearchText(const QString &text)
     if (m_searchText == text)
         return;
     m_searchText = text;
-#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+#if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
     beginFilterChange();
     endFilterChange(QSortFilterProxyModel::Direction::Rows);
 #else
@@ -41,7 +41,7 @@ void VersionFilterModel::setChannel(const QString &channel)
     if (m_channel == channel)
         return;
     m_channel = channel;
-#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+#if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
     beginFilterChange();
     endFilterChange(QSortFilterProxyModel::Direction::Rows);
 #else

@@ -151,8 +151,9 @@ jobs:
 
       - name: Install and smoke Flatpak
         run: |
+          # flatpak treats a relative path as a remote ref; pass an absolute path.
           flatpak install --user -y --noninteractive --reinstall \
-            build/flatpak-repo org.bmcd.BMCD
+            "$PWD/build/flatpak-repo" org.bmcd.BMCD
           packaging/smoke-artifact.sh flatpak
 
       - name: Verify Flatpak bundle
