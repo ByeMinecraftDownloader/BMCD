@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://github.com/ByeMinecraftDownloader/BMCD/releases/latest"><img src="https://img.shields.io/github/v/release/ByeMinecraftDownloader/BMCD?style=flat-square" alt="Release"></a>
   <a href="https://github.com/ByeMinecraftDownloader/BMCD/actions/workflows/ci.yml"><img src="https://github.com/ByeMinecraftDownloader/BMCD/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-WTFPL%20v2-blue?style=flat-square" alt="License: WTFPL v2"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue?style=flat-square" alt="License: GPL-3.0-or-later"></a>
   <img src="https://img.shields.io/badge/Qt-6.5%2B-41CD52?style=flat-square" alt="Qt 6.5+">
   <img src="https://img.shields.io/badge/platform-Linux%20%7C%20Windows-lightgrey?style=flat-square" alt="Linux and Windows">
 </p>
@@ -204,4 +204,7 @@ lrelease i18n/bmcd_en.ts
 
 ## 许可证
 
-本项目以 **WTFPL v2** 发布，详见 [`LICENSE`](LICENSE)。整合包导出另有许可闸门：禁止再分发的文件默认不会进入自包含包。
+本项目以 **GNU General Public License v3.0 或更新版本（GPL-3.0-or-later）** 发布，详见 [`LICENSE`](LICENSE)。
+Copyright (C) 2026 RyanZ <byeminecraftdownloader@proton.me>。
+
+整合包导出另有许可闸门：禁止再分发的文件默认不会进入自包含包。
