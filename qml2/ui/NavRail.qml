@@ -13,10 +13,10 @@ Item {
     implicitHeight: 320
 
     readonly property var items: [
-        { label: qsTr("版本"), glyph: "▤" },
-        { label: qsTr("队列"), glyph: "≡" },
-        { label: qsTr("导出"), glyph: "↥" },
-        { label: qsTr("设置"), glyph: "⚙" }
+        { label: qsTr("点菜"), icon: "versions" },
+        { label: qsTr("烹饪"), icon: "queue" },
+        { label: qsTr("出餐"), icon: "serve" },
+        { label: qsTr("设置"), icon: "settings" }
     ]
 
     Column {
@@ -28,44 +28,50 @@ Item {
         Repeater {
             model: rail.items
             delegate: Item {
+                id: navItem
                 width: rail.width
-                height: 54
+                height: 58
+                Accessible.role: Accessible.PageTab
+                Accessible.name: modelData.label
+                Accessible.selected: index === rail.current
+
+                Rectangle {
+                    anchors.fill: parent
+                    anchors.margins: 4
+                    radius: Tokens.radiusMd
+                    color: hover.hovered && index !== rail.current ? Tokens.surfaceHigh : "transparent"
+                }
 
                 Rectangle {
                     id: pill
                     anchors.centerIn: parent
                     width: 48
-                    height: 30
-                    radius: Tokens.radiusPill
+                    height: 46
+                    radius: Tokens.radiusLg
                     color: index === rail.current ? Tokens.primaryContainer : "transparent"
                     Behavior on color { ColorAnimation { duration: Motion.micro } }
                 }
 
                 Column {
                     anchors.centerIn: parent
-                    spacing: 2
-                    Text {
+                    spacing: 3
+                    Icon {
                         anchors.horizontalCenter: parent.horizontalCenter
-                        text: modelData.glyph
-                        color: index === rail.current ? Tokens.onPrimaryContainer : Tokens.textMuted
-                        font.pixelSize: 15
+                        name: modelData.icon
+                        size: 19
+                        color: index === rail.current ? Tokens.primaryContainerInk : Tokens.textMuted
                     }
                     Text {
                         anchors.horizontalCenter: parent.horizontalCenter
                         text: modelData.label
-                        color: index === rail.current ? Tokens.onPrimaryContainer : Tokens.textMuted
-                        font.pixelSize: Tokens.fontSizeCaption
+                        color: index === rail.current ? Tokens.primaryContainerInk : Tokens.textMuted
+                        font.pixelSize: 11
+                        font.weight: index === rail.current ? Font.DemiBold : Font.Normal
                     }
                 }
 
                 HoverHandler { id: hover }
-                Rectangle {
-                    anchors.fill: parent
-                    radius: Tokens.radiusMd
-                    color: hover.hovered && index !== rail.current ? Tokens.surfaceHigh : "transparent"
-                }
-
-                TapHandler { onTapped: rail.select(index) }
+                TapHandler { cursorShape: Qt.PointingHandCursor; onTapped: rail.select(index) }
             }
         }
     }

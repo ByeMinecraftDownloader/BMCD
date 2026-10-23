@@ -35,7 +35,10 @@ class VersionDetail : public QObject
     Q_PROPERTY(qint64 downloadTotalBytes READ downloadTotalBytes NOTIFY downloadChanged)
     Q_PROPERTY(double speed READ speed NOTIFY downloadChanged)
     Q_PROPERTY(QString downloadError READ downloadError NOTIFY downloadChanged)
+    Q_PROPERTY(bool cacheChecking READ cacheChecking NOTIFY downloadChanged)
+    Q_PROPERTY(bool cacheChecked READ cacheChecked NOTIFY downloadChanged)
     Q_PROPERTY(QString targetDir READ targetDir CONSTANT)
+    Q_PROPERTY(QString hashLabel READ hashLabel CONSTANT)
 
 public:
     explicit VersionDetail(QObject *parent = nullptr);
@@ -58,11 +61,15 @@ public:
     qint64 downloadTotalBytes() const { return m_downloadTotalBytes; }
     double speed() const { return m_speed; }
     QString downloadError() const { return m_downloadError; }
+    bool cacheChecking() const { return m_cacheChecking; }
+    bool cacheChecked() const { return m_cacheChecked; }
     QString targetDir() const;
+    QString hashLabel() const { return QStringLiteral("SHA-1"); }
 
     Q_INVOKABLE void select(const QString &versionId, const QString &versionJsonUrl);
     Q_INVOKABLE void clear();
     Q_INVOKABLE void startDownload();
+    Q_INVOKABLE void verifyCache();
     Q_INVOKABLE void pauseDownload();
     Q_INVOKABLE void cancelDownload();
 
@@ -74,9 +81,12 @@ signals:
 
 private:
     void fetchVersionJson(const QString &url);
+    void fetchVersionJsonAt(const QStringList &urls, int index);
     void fetchAssetIndex(const QJsonObject &versionJson);
+    void fetchAssetIndexAt(const QStringList &urls, int index, const QJsonObject &versionJson);
     void finishPlan(const QJsonObject &versionJson, const QJsonObject &assetIndexJson);
     void setState(const QString &state, const QString &error = QString());
+    void stopTask();
 
     QNetworkAccessManager m_nam;
     QTimer m_timeout;
@@ -97,4 +107,6 @@ private:
     qint64 m_downloadTotalBytes = 0;
     double m_speed = 0.0;
     QString m_downloadError;
+    bool m_cacheChecking = false;
+    bool m_cacheChecked = false;
 };

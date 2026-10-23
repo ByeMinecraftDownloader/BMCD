@@ -1,0 +1,273 @@
+name: Release
+
+# A version tag is the only trigger.  The tag must match the CMake project
+# version; packaging jobs then build from that exact commit and the final job
+# publishes the checksums and artifacts as a GitHub Release.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  QT_VERSION: 6.7.2
+
+jobs:
+  prepare:
+    name: Validate version tag
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read and check version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "tag '$tag' is not a version tag (expected vX.Y.Z)" >&2
+            exit 1
+          fi
+          project=$(sed -n 's/^project(ByeMinecraftDownloader VERSION \([^ ]*\).*/\1/p' CMakeLists.txt)
+          if [[ "$version" != "$project" ]]; then
+            echo "tag version '$version' does not match CMakeLists.txt project version '$project'" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "releasing BMCD $version from $GITHUB_SHA"
+
+  arch:
+    name: Arch package
+    needs: prepare
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build, install and smoke the Arch package
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -e VERSION \
+            -v "$PWD:/workspace" \
+            -w /workspace \
+            archlinux:base-devel \
+            bash -lc '
+              set -euo pipefail
+              pacman -Syu --noconfirm --needed \
+                base-devel cmake ninja qt6-base qt6-declarative qt6-svg ttf-dejavu
+              id builder >/dev/null 2>&1 || useradd -m builder
+              mkdir -p /workspace/build
+              chown -R builder:builder /workspace/build
+              runuser -u builder -- env HOME=/home/builder VERSION="$VERSION" \
+                bash /workspace/packaging/arch/build-package.sh --version "$VERSION"
+
+              package=$(find /workspace/build/arch -maxdepth 1 -name "*.pkg.tar.zst" | head -n1)
+              test -n "$package"
+              pacman -U --noconfirm "$package"
+              bmcd --version
+              bmcd --i18n-check
+              QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+                timeout 30 bmcd --view settings --dump-layout >/dev/null
+            '
+
+      - name: Make artifacts readable
+        run: sudo chown -R "$(id -u):$(id -g)" build
+
+      - name: Verify checksum
+        run: |
+          test -s build/arch/SHA256SUMS
+          (cd build/arch && sha256sum -c SHA256SUMS)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arch-package
+          path: |
+            build/arch/*.pkg.tar.zst
+            build/arch/SHA256SUMS
+          if-no-files-found: error
+
+  debian:
+    name: Debian package
+    needs: prepare
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          cache: true
+
+      - name: Install runtime and packaging tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            libegl1 libgl1 libxkbcommon0 libxkbcommon-x11-0 libfontconfig1 \
+            fonts-dejavu-core librsvg2-bin libxcb-cursor0 libxcb-icccm4 \
+            libxcb-keysyms1 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1
+
+      - name: Build application and AppDir
+        run: |
+          set -euo pipefail
+          mkdir -p .tools
+          base=https://github.com
+          curl -fL -o .tools/linuxdeploy-x86_64.AppImage \
+            "$base/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage"
+          curl -fL -o .tools/linuxdeploy-plugin-qt-x86_64.AppImage \
+            "$base/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage"
+          curl -fL -o .tools/appimagetool-x86_64.AppImage \
+            "$base/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
+          chmod +x .tools/*.AppImage
+          APPIMAGE_EXTRACT_AND_RUN=1 packaging/build-appimage.sh
+          ctest --test-dir build --output-on-failure
+
+      - name: Build Debian package
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          packaging/debian/build-deb.sh \
+            --version "$VERSION" \
+            --appdir build/AppDir \
+            --out-dir build/debian
+
+      - name: Install and smoke the .deb
+        run: |
+          set -euo pipefail
+          sudo dpkg -i build/debian/*.deb
+          bmcd --version
+          bmcd --i18n-check
+          QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+            timeout 30 bmcd --view settings --dump-layout >/dev/null
+          sudo dpkg -r bmcd
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: debian-package
+          path: |
+            build/debian/*.deb
+            build/debian/SHA256SUMS
+          if-no-files-found: error
+
+  windows:
+    name: Windows installer
+    needs: prepare
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          cache: true
+
+      - name: Configure and build
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release --parallel 2
+
+      - name: Unit tests
+        run: ctest --test-dir build --output-on-failure -C Release
+
+      - name: Stage portable payload
+        run: pwsh packaging/build-windows.ps1
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build installer
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: pwsh packaging/windows/build-installer.ps1 -Version $env:VERSION
+
+      - name: Smoke the staged executable
+        shell: pwsh
+        run: |
+          & packaging/windows/smoke-exe.ps1 -Exe "dist\BMCD\bmcd.exe"
+
+      - name: Install and smoke the installer
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem "dist\BMCD-Setup-*.exe" | Select-Object -First 1
+          if (-not $setup) { throw "installer not found" }
+          $installDir = Join-Path $env:RUNNER_TEMP "bmcd-installed"
+          $proc = Start-Process -FilePath $setup.FullName `
+            -ArgumentList @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$installDir") `
+            -Wait -PassThru
+          if ($proc.ExitCode -ne 0) { throw "installer exited with $($proc.ExitCode)" }
+          $exe = Join-Path $installDir "bmcd.exe"
+          if (-not (Test-Path $exe)) { throw "installed bmcd.exe not found at $exe" }
+          & packaging/windows/smoke-exe.ps1 -Exe $exe
+
+      - name: Verify checksums
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "dist\SHA256SUMS.txt")) { throw "missing dist\SHA256SUMS.txt" }
+          if (-not (Test-Path "dist\BMCD-windows-x64.zip")) { throw "missing portable zip" }
+          $setups = @(Get-ChildItem "dist\BMCD-Setup-*.exe")
+          if ($setups.Count -ne 1 -or $setups[0].Length -le 0) {
+            throw "expected exactly one non-empty installer"
+          }
+          foreach ($line in Get-Content "dist\SHA256SUMS.txt") {
+            if ($line -notmatch '^([0-9a-fA-F]{64})\s+(.+)$') {
+              throw "malformed checksum line: $line"
+            }
+            $expected = $Matches[1].ToLowerInvariant()
+            $file = Join-Path "dist" $Matches[2]
+            if (-not (Test-Path $file)) { throw "checksum target missing: $file" }
+            $actual = (Get-FileHash -Algorithm SHA256 $file).Hash.ToLowerInvariant()
+            if ($actual -ne $expected) { throw "checksum mismatch: $file" }
+          }
+          Get-Content "dist\SHA256SUMS.txt"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: |
+            dist/BMCD-Setup-*.exe
+            dist/BMCD-windows-x64.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: [prepare, arch, debian, windows]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect release assets
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          find artifacts -type f \
+            \( -name '*.pkg.tar.zst' -o -name '*.deb' -o -name '*.exe' -o -name '*.zip' \) \
+            -exec cp -v {} release/ \;
+          (cd release && sha256sum ./* > SHA256SUMS)
+          ls -lh release
+          cat release/SHA256SUMS
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$GITHUB_REF_NAME" release/* \
+            --verify-tag \
+            --title "BMCD ${GITHUB_REF_NAME#v}" \
+            --generate-notes

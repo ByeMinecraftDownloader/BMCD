@@ -1,6 +1,7 @@
 #include <QCommandLineParser>
 #include <QLocale>
 #include <QTranslator>
+#include <qqml.h>
 #include <QCoreApplication>
 #include <QDir>
 #include <QElapsedTimer>
@@ -15,6 +16,7 @@
 #include <QNetworkReply>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QQuickItem>
 #include <QQuickWindow>
 #include <QStorageInfo>
 #include <QCryptographicHash>
@@ -22,6 +24,7 @@
 #include <QTextStream>
 #include <QTimer>
 
+#include "AppSettings.h"
 #include "DownloadTask.h"
 #include "Pack.h"
 #include "Deployer.h"
@@ -39,6 +42,7 @@
 #include "platform/Paths.h"
 #include "platform/PlatformInfo.h"
 #include "theme/ThemeSource.h"
+#include "theme/IconImageProvider.h"
 #include "theme/TokenBuilder.h"
 #include "InstalledVersions.h"
 #include "Instances.h"
@@ -224,7 +228,7 @@ void setCoreMetadata()
 {
     QCoreApplication::setApplicationName(QStringLiteral("bmcd"));
     QCoreApplication::setOrganizationName(QStringLiteral("BMCD"));
-    QCoreApplication::setApplicationVersion(QStringLiteral("1.0.0"));
+    QCoreApplication::setApplicationVersion(QStringLiteral(BMCD_VERSION));
 }
 
 // Some environments swallow Qt's console output entirely; MC_LOG answers
@@ -535,6 +539,29 @@ int runFetchModel()
     return 0;
 }
 
+void dumpItemTree(QQuickItem *item, int depth, QTextStream &out)
+{
+    if (!item || !item->isVisible())
+        return;
+    const QString cls = QString::fromLatin1(item->metaObject()->className());
+    const QString text = item->property("text").toString();
+    const QPointF origin = item->mapToScene(QPointF(0, 0));
+    out << QString(depth * 2, ' ') << cls;
+    if (!text.isEmpty())
+        out << " \"" << text.left(40).replace('\n', ' ') << "\"";
+    out << " @(" << qRound(origin.x()) << "," << qRound(origin.y()) << ") "
+        << qRound(item->width()) << "x" << qRound(item->height());
+    const QVariant font = item->property("font");
+    if (!text.isEmpty() && font.isValid()) {
+        const QFont f = font.value<QFont>();
+        out << " font=" << f.pixelSize() << "/" << f.weight();
+    }
+    out << "\n";
+    const auto children = item->childItems();
+    for (QQuickItem *child : children)
+        dumpItemTree(child, depth + 1, out);
+}
+
 int runI18nCheck()
 {
     QTranslator translator;
@@ -550,12 +577,15 @@ int runI18nCheck()
         const char *expected;
     };
     static const Probe probes[] = {
-        {"NavRail", "版本", "Versions"},
-        {"NavRail", "导出", "Serve"},
-        {"OrderView", "刷新清单", "Refresh"},
-        {"ServeView", "出菜到文件夹", "Serve to folder"},
-        {"SettingsView", "游戏目录", "Game directory"},
-        {"CookView", "等待开始", "Waiting"},
+        {"NavRail", "点菜", "Pick"},
+        {"OrderView", "点菜", "Pick"},
+        {"OrderView", "先选锅底，再按需加配菜；菜篮满了就开火。",
+         "Pick the base version, then add mods; start cooking when the basket is ready."},
+        {"ServeView", "出口", "Exits"},
+        {"ServeView", "这桌菜", "This dish"},
+        {"ServeView", "已烹饪", "Cooked"},
+        {"WindowChrome", "关闭", "Close"},
+        {"CookView", "当前任务", "Current task"},
     };
     int failures = 0;
     for (const Probe &probe : probes) {
@@ -623,7 +653,7 @@ void addOptions(QCommandLineParser &parser)
     parser.addOption({QStringLiteral("instances"), QStringLiteral("List discovered game/instance directories.")});
     parser.addOption({QStringLiteral("instances-root"), QStringLiteral("Root to scan with --instances."),
                       QStringLiteral("dir")});
-    parser.addOption({QStringLiteral("confirm"), QStringLiteral("Confirm redistribution of a file path (repeatable)."),
+    parser.addOption({QStringLiteral("confirm"), QStringLiteral("Confirm redistribution of a file path or licence group id (repeatable)."),
                       QStringLiteral("path")});
     parser.addOption({QStringLiteral("dry-run"), QStringLiteral("Preflight only; write nothing.")});
     parser.addOption({QStringLiteral("no-backup"), QStringLiteral("Do not back up files being replaced.")});
@@ -646,10 +676,11 @@ void addOptions(QCommandLineParser &parser)
     parser.addOption({QStringLiteral("benchmark"), QStringLiteral("Print startup/first-frame/memory numbers and exit.")});
     parser.addOption({QStringLiteral("view"), QStringLiteral("Open on a view: order|cook|serve|settings."),
                       QStringLiteral("name"), QStringLiteral("order")});
+    parser.addOption({QStringLiteral("size"), QStringLiteral("Window size, e.g. 880x600."),
+                      QStringLiteral("WxH")});
+    parser.addOption({QStringLiteral("dump-layout"), QStringLiteral("Print the QML item tree and exit.")});
     parser.addOption({QStringLiteral("lang"), QStringLiteral("UI language code, e.g. en or zh_CN."),
                       QStringLiteral("code")});
-    parser.addOption({QStringLiteral("ui"), QStringLiteral("UI generation: v2 (new) or v1 (frozen)."),
-                      QStringLiteral("gen"), QStringLiteral("v2")});
 }
 
 QString resolveTarget(const QCommandLineParser &parser)
@@ -866,7 +897,9 @@ int runLicenses(const QString &packPath, const QStringList &confirmed)
     const license::GateResult gate = license::evaluate(pack, confirmed);
     out() << gate.redistributionJson << Qt::endl;
     out() << "allowed " << gate.allowed.size() << ", needs-confirm " << gate.needsConfirm.size()
-          << ", denied " << gate.denied.size() << Qt::endl;
+          << ", denied " << gate.denied.size() << " (denied groups "
+          << gate.deniedGroups.size() << ", needs-confirm groups "
+          << gate.needsConfirmGroups.size() << ")" << Qt::endl;
     return gate.exportable ? 0 : 4;
 }
 
@@ -895,10 +928,15 @@ int runPackRender(const QString &packPath, const QString &format, const QString 
     } else if (format == QLatin1String("self")) {
         const license::GateResult gate = license::evaluate(pack, confirmed);
         if (!gate.denied.isEmpty()) {
-            out() << Qt::endl << "error: 以下文件未确认再分发：" << Qt::endl;
-            for (const QString &path : gate.denied)
-                out() << "  " << path << Qt::endl;
-            out() << "复查：bmcd --pack " << packPath << " --licenses" << Qt::endl;
+            out() << Qt::endl << "error: 以下模组未确认再分发：" << Qt::endl;
+            for (const license::GateGroup &group : gate.groups) {
+                if (group.verdict != license::Verdict::Denied)
+                    continue;
+                out() << "  " << group.name << "  [" << group.id << "]  "
+                      << group.pendingCount << " 个文件" << Qt::endl;
+            }
+            out() << "可用 --confirm <组 id> 一次确认整个模组；复查：bmcd --pack "
+                  << packPath << " --licenses" << Qt::endl;
             return 4;
         }
         if (!gate.needsConfirm.isEmpty()) {
@@ -1003,24 +1041,46 @@ int main(int argc, char *argv[])
     addOptions(parser);
     parser.process(app);
 
-    const QString target = resolveTarget(parser);
-    qputenv("MC_TARGET", target.toUtf8());
+    const QString target = parser.isSet(QStringLiteral("target"))
+            ? parser.value(QStringLiteral("target"))
+            : AppSettings::resolvedTargetDir();
+    if (parser.isSet(QStringLiteral("target")))
+        qputenv("MC_TARGET", target.toUtf8());
 
-    // Language: explicit --lang, then BMCD_LANG, then the system locale. Chinese
-    // is the source language so only English needs a catalog.
+    // Language: explicit --lang, then BMCD_LANG, then the persisted setting,
+    // then the system locale. Chinese is the source and needs no catalog.
+    AppSettings appSettings;
     QString language = parser.value(QStringLiteral("lang"));
     if (language.isEmpty())
         language = qEnvironmentVariable("BMCD_LANG");
     if (language.isEmpty())
-        language = QLocale::system().name();
+        language = appSettings.language();
     QTranslator translator;
-    if (language.startsWith(QLatin1String("en"), Qt::CaseInsensitive)
-        && translator.load(QStringLiteral(":/i18n/bmcd_en.qm"))) {
-        app.installTranslator(&translator);
-    }
+    const auto applyLanguage = [&](const QString &code) {
+        const bool english = code.startsWith(QLatin1String("en"), Qt::CaseInsensitive);
+        if (english) {
+            if (!translator.load(QStringLiteral(":/i18n/bmcd_en.qm")))
+                qWarning("BMCD: could not load the English translation");
+            app.installTranslator(&translator);
+        } else {
+            app.removeTranslator(&translator);
+        }
+    };
+    applyLanguage(language);
 
     // ── UI ──────────────────────────────────────────────────────────────
     QQmlApplicationEngine engine;
+    qmlRegisterSingletonInstance("BMCD.Settings", 1, 0, "AppSettings", &appSettings);
+    QObject::connect(&appSettings, &AppSettings::languageChanged, &engine, [&] {
+        const QString code = appSettings.language();
+        applyLanguage(code);
+        engine.retranslate();
+        engine.rootContext()->setContextProperty(
+                QStringLiteral("uiLanguage"),
+                code.startsWith(QLatin1String("en"), Qt::CaseInsensitive)
+                        ? QStringLiteral("English") : QStringLiteral("中文"));
+    });
+    engine.addImageProvider(QStringLiteral("bmcdicon"), new IconImageProvider);
 
     // Deep link / screenshot support: preselect a version when the window opens.
     engine.rootContext()->setContextProperty(QStringLiteral("initialVersion"),
@@ -1029,6 +1089,14 @@ int main(int argc, char *argv[])
                                                      : QString());
     engine.rootContext()->setContextProperty(QStringLiteral("autoStartDownload"),
                                              qEnvironmentVariableIsSet("MC_AUTOSTART"));
+    QSize initialSize(1120, 760);
+    const QStringList sizeParts = parser.value(QStringLiteral("size")).split(QLatin1Char('x'));
+    if (sizeParts.size() == 2 && sizeParts.at(0).toInt() > 0 && sizeParts.at(1).toInt() > 0)
+        initialSize = QSize(sizeParts.at(0).toInt(), sizeParts.at(1).toInt());
+    engine.rootContext()->setContextProperty(QStringLiteral("initialWidth"), initialSize.width());
+    engine.rootContext()->setContextProperty(QStringLiteral("initialHeight"), initialSize.height());
+    engine.rootContext()->setContextProperty(QStringLiteral("homeDir"), QDir::homePath());
+
     const QString view = parser.value(QStringLiteral("view"));
     int initialSection = view == QLatin1String("cook") ? 1
                        : view == QLatin1String("serve") ? 2
@@ -1066,6 +1134,26 @@ int main(int argc, char *argv[])
                         out() << "benchmark: first-frame " << startupTimer.elapsed()
                               << " ms, window-created " << createdMs << " ms, rss "
                               << (rssKb / 1024) << " MB" << Qt::endl;
+                        app.quit();
+                    });
+                },
+                Qt::QueuedConnection);
+    }
+
+    if (parser.isSet(QStringLiteral("dump-layout"))) {
+        QObject::connect(
+                &engine,
+                &QQmlApplicationEngine::objectCreated,
+                &app,
+                [&app](QObject *object, const QUrl &) {
+                    auto *window = qobject_cast<QQuickWindow *>(object);
+                    if (!window)
+                        return;
+                    const int delay = qEnvironmentVariableIntValue("MC_DUMP_DELAY") > 0
+                            ? qEnvironmentVariableIntValue("MC_DUMP_DELAY") : 800;
+                    QTimer::singleShot(delay, window, [window, &app] {
+                        QTextStream out(stdout);
+                        dumpItemTree(window->contentItem(), 0, out);
                         app.quit();
                     });
                 },

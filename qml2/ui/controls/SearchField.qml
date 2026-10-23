@@ -11,6 +11,7 @@ Rectangle {
     property string label: ""
     property int focusRing: activeFocus ? 1 : 0
     signal accepted()
+    signal editingFinished()
 
     implicitHeight: 34
     radius: Tokens.radiusSm
@@ -47,8 +48,9 @@ Rectangle {
         verticalAlignment: TextInput.AlignVCenter
         color: Tokens.text
         selectionColor: Tokens.primary
-        selectedTextColor: Tokens.onPrimary
+        selectedTextColor: Tokens.primaryInk
         font.pixelSize: Tokens.fontSizeBody
         onAccepted: field.accepted()
+        onEditingFinished: field.editingFinished()
     }
 }

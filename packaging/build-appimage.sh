@@ -28,8 +28,23 @@ APPIMAGETOOL="$TOOLS/appimagetool-$ARCH.AppImage"
 export APPIMAGE_EXTRACT_AND_RUN=1
 export ARCH
 
+# The published AppImage must run on Ubuntu 22.04. Building
+# on a newer distro silently binds to a newer glibc, so refuse that by default;
+# CI builds on ubuntu-22.04 and packaging/smoke-artifact.sh checks the result.
+GLIBC_BASELINE=${BMCD_GLIBC_BASELINE:-2.35}
+GLIBC_HOST=$(getconf GNU_LIBC_VERSION 2>/dev/null | awk '{print $2}' || true)
+if [[ -n $GLIBC_HOST ]] && \
+   [[ $(printf '%s\n%s\n' "$GLIBC_HOST" "$GLIBC_BASELINE" | sort -V | tail -1) != "$GLIBC_BASELINE" ]]; then
+    if [[ ${BMCD_ALLOW_NEW_GLIBC:-} != 1 ]]; then
+        echo "host glibc $GLIBC_HOST is newer than the $GLIBC_BASELINE baseline" >&2
+        echo "build on Ubuntu 22.04, or set BMCD_ALLOW_NEW_GLIBC=1 for a local-only artifact" >&2
+        exit 1
+    fi
+    echo "warning: host glibc $GLIBC_HOST exceeds baseline $GLIBC_BASELINE; local artifact only" >&2
+fi
+
 for tool in "$LINUXDEPLOY" "$QT_PLUGIN" "$APPIMAGETOOL"; do
-    [[ -x $tool ]] || { echo "missing tool: $tool (see packaging/README.md)" >&2; exit 1; }
+    [[ -x $tool ]] || { echo "missing tool: $tool (set BMCD_TOOLS to a directory containing the AppImage tools)" >&2; exit 1; }
 done
 
 QT_QMAKE=${QT_QMAKE:-$(command -v qmake6 || command -v qmake)}
@@ -129,6 +144,36 @@ exec "$APPDIR/usr/bin/bmcd" "$@"
 LAUNCHER
 chmod 755 "$APPDIR/AppRun"
 
-"$APPIMAGETOOL" "$APPDIR" "$OUTPUT"
+# The host check above catches the usual mistake; this one checks the actual
+# payload, including Qt libraries copied by linuxdeploy. A GLIBC_2.36+ symbol
+# here means the artifact will not start on the Ubuntu 22.04 baseline.
+if command -v readelf >/dev/null; then
+    MAX_GLIBC=$(find "$APPDIR/usr/bin" "$APPDIR/usr/lib" -type f \
+        \( -perm -u+x -o -name '*.so*' \) -print0 2>/dev/null |
+        xargs -0 -r readelf --version-info --wide 2>/dev/null |
+        grep -oE 'GLIBC_[0-9]+\.[0-9]+' | sort -V | tail -1 || true)
+    if [[ -n $MAX_GLIBC ]] && \
+       [[ $(printf '%s\n%s\n' "$MAX_GLIBC" "GLIBC_$GLIBC_BASELINE" | sort -V | tail -1) != "GLIBC_$GLIBC_BASELINE" ]]; then
+        if [[ ${BMCD_ALLOW_NEW_GLIBC:-} != 1 ]]; then
+            echo "payload requires $MAX_GLIBC, newer than the GLIBC_$GLIBC_BASELINE baseline" >&2
+            exit 1
+        fi
+        echo "warning: payload requires $MAX_GLIBC; local artifact only" >&2
+    else
+        echo "payload glibc requirement: ${MAX_GLIBC:-unknown} (baseline GLIBC_$GLIBC_BASELINE)"
+    fi
+fi
+
+if [[ -n ${BMCD_APPIMAGE_RUNTIME:-} ]]; then
+    "$APPIMAGETOOL" --runtime-file "$BMCD_APPIMAGE_RUNTIME" "$APPDIR" "$OUTPUT"
+else
+    "$APPIMAGETOOL" "$APPDIR" "$OUTPUT"
+fi
+(cd "$(dirname "$OUTPUT")" && sha256sum "$(basename "$OUTPUT")" > SHA256SUMS)
 echo
 echo "built: $OUTPUT"
+cat "$(dirname "$OUTPUT")/SHA256SUMS"
+
+if [[ -z ${BMCD_NO_SMOKE:-} ]]; then
+    "$ROOT/packaging/smoke-artifact.sh" appimage "$OUTPUT"
+fi

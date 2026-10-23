@@ -3,6 +3,7 @@
 #include <QDateTime>
 #include <QObject>
 #include <QString>
+#include <QStringList>
 #include <qqmlintegration.h>
 
 class QNetworkAccessManager;
@@ -50,6 +51,7 @@ signals:
 private:
     bool loadFromCache();
     void startRequest();
+    void requestManifest();
     bool parseManifest(const QByteArray &payload);
     QString cacheFilePath() const;
     void setLoading(bool loading);
@@ -58,6 +60,8 @@ private:
     VersionListModel *m_versions = nullptr;
     QNetworkAccessManager *m_network = nullptr;
     QNetworkReply *m_reply = nullptr;
+    QStringList m_manifestCandidates;
+    int m_manifestIndex = 0;
     bool m_loading = false;
     bool m_offline = false;
     QString m_error;

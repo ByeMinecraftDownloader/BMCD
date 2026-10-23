@@ -17,7 +17,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-24.04
+          # AppImage baseline: build on Ubuntu 22.04 (glibc 2.35) so the
+          # artifact does not bind to a newer development host.
+          - os: ubuntu-22.04
             name: linux
           - os: windows-2022
             name: windows
@@ -94,21 +96,13 @@ jobs:
           chmod +x .tools/*.AppImage
           APPIMAGE_EXTRACT_AND_RUN=1 BMCD_SKIP_BUILD=1 packaging/build-appimage.sh
           test -s build/BMCD-x86_64.AppImage
+          test -s build/SHA256SUMS
+          (cd build && sha256sum -c SHA256SUMS)
 
-      - name: Package portable zip (Windows)
+      - name: Package Windows portable (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force dist | Out-Null
-          windeployqt --release --no-translations --dir dist build/Release/bmcd.exe
-          Compress-Archive -Path dist/* -DestinationPath BMCD-windows-x64.zip
-          if (-not (Test-Path BMCD-windows-x64.zip)) { throw "zip missing" }
-
-      - name: Package dmg (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          macdeployqt build/bmcd.app -dmg -qmldir=qml2
-          test -s build/bmcd.dmg
+        run: pwsh packaging/build-windows.ps1
 
       - name: Upload packages
         if: always()
@@ -117,8 +111,9 @@ jobs:
           name: ${{ matrix.name }}-package
           path: |
             build/BMCD-x86_64.AppImage
-            BMCD-windows-x64.zip
-            build/bmcd.dmg
+            build/SHA256SUMS
+            dist/BMCD-windows-x64.zip
+            dist/SHA256SUMS.txt
           if-no-files-found: ignore
 
       - name: Upload test artifacts
@@ -132,3 +127,45 @@ jobs:
             ui.png
             benchmark.txt
           if-no-files-found: ignore
+
+  flatpak:
+    name: flatpak
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Flatpak tooling
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub \
+            https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y --noninteractive flathub \
+            org.kde.Platform//6.9 org.kde.Sdk//6.9
+
+      - name: Build Flatpak bundle (working tree)
+        # CI tests the checked-out tree, which may be a merge commit that is not
+        # reachable from the public repository. Release builds use the fixed
+        # git commit in the manifest instead (see packaging/build-flatpak.sh).
+        run: packaging/build-flatpak.sh --no-install --working-tree
+
+      - name: Install and smoke Flatpak
+        run: |
+          flatpak install --user -y --noninteractive --reinstall \
+            build/flatpak-repo org.bmcd.BMCD
+          packaging/smoke-artifact.sh flatpak
+
+      - name: Verify Flatpak bundle
+        run: |
+          test -s build/BMCD-x86_64.flatpak
+          test -s build/SHA256SUMS
+          (cd build && sha256sum -c SHA256SUMS)
+
+      - name: Upload Flatpak
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-flatpak
+          path: |
+            build/BMCD-x86_64.flatpak
+            build/SHA256SUMS
+          if-no-files-found: error

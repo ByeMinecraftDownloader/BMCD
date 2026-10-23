@@ -14,9 +14,9 @@ Rectangle {
     radius: Tokens.radiusMd
     color: selected ? Tokens.primaryContainer
          : interactive && hover.hovered ? Tokens.surfaceHigh
-         : Tokens.surface
-    border.width: selected ? 1 : 0
-    border.color: Tokens.primary
+         : Tokens.surfaceContainer
+    border.width: 1
+    border.color: selected ? Tokens.primary : Tokens.hairline
 
     Behavior on color { ColorAnimation { duration: Motion.micro } }
 

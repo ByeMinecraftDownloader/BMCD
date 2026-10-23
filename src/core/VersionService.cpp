@@ -1,5 +1,6 @@
 #include "core/VersionService.h"
 
+#include "core/DownloadSources.h"
 #include "core/VersionListModel.h"
 
 #include <QDir>
@@ -85,6 +86,14 @@ QString VersionService::urlFor(const QString &versionId) const
 
 void VersionService::startRequest()
 {
+    m_manifestCandidates = DownloadSources::candidates(QString::fromLatin1(kManifestUrl),
+                                                        QStringLiteral("manifest"));
+    m_manifestIndex = 0;
+    requestManifest();
+}
+
+void VersionService::requestManifest()
+{
     if (m_reply) {
         // abort() emits finished() synchronously, and the finished handler
         // clears m_reply; keep our own pointer so the deleteLater() below can
@@ -95,7 +104,9 @@ void VersionService::startRequest()
         previous->deleteLater();
     }
 
-    QNetworkRequest request{QUrl(QString::fromLatin1(kManifestUrl))};
+    const QString url = m_manifestCandidates.value(m_manifestIndex,
+                                                   QString::fromLatin1(kManifestUrl));
+    QNetworkRequest request{QUrl(url)};
     request.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("BMCD/0.2"));
     request.setTransferTimeout(15000);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
@@ -113,6 +124,11 @@ void VersionService::startRequest()
         reply->deleteLater();
 
         setLoading(false);
+
+        if (reply->error() != QNetworkReply::NoError && ++m_manifestIndex < m_manifestCandidates.size()) {
+            requestManifest();
+            return;
+        }
 
         if (reply->error() != QNetworkReply::NoError) {
             const QString message = reply->errorString();

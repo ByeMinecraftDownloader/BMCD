@@ -10,8 +10,8 @@ Dialog {
     property string acceptText: "确定"
     property string rejectText: "取消"
     property bool destructive: false
-    signal accepted()
-    signal rejected()
+    signal confirmed()
+    signal cancelled()
 
     modal: true
     anchors.centerIn: parent
@@ -40,13 +40,13 @@ Dialog {
         anchors.right: parent.right
         AppButton {
             text: dialog.rejectText
-            onClicked: { dialog.rejected(); dialog.close(); }
+            onClicked: { dialog.cancelled(); dialog.close(); }
         }
         AppButton {
             text: dialog.acceptText
             primary: !dialog.destructive
             danger: dialog.destructive
-            onClicked: { dialog.accepted(); dialog.close(); }
+            onClicked: { dialog.confirmed(); dialog.close(); }
         }
     }
 }

@@ -103,9 +103,11 @@ private slots:
     void deployWithoutOverwriteReportsConflict();
     void verifyDeploymentDetectsCorruption();
     void licenceGateVerdicts();
+    void licenceGroupsByParent();
     void zipReaderRoundTrip();
     void importModrinthArchive();
     void importCurseForgeManifest();
+    void ftbEncodesUrlSpaces();
     void instancesAreDiscovered();
 };
 
@@ -329,6 +331,7 @@ void TestPack::licenceGateVerdicts()
         file.url = QStringLiteral("https://example.invalid/x");
         file.sha1 = QString(40, QLatin1Char('a'));
         file.size = 1;
+        file.kind = QStringLiteral("mod");
         file.licenseId = entry.second;
         pack.files.append(file);
     }
@@ -350,6 +353,63 @@ void TestPack::licenceGateVerdicts()
 
 QTEST_GUILESS_MAIN(TestPack)
 #include "tst_pack.moc"
+
+
+void TestPack::licenceGroupsByParent()
+{
+    Pack pack;
+    pack.name = QStringLiteral("G");
+    pack.minecraftVersion = QStringLiteral("26.3");
+    pack.versionId = QStringLiteral("1");
+
+    const auto add = [&pack](const QString &path, const QString &license,
+                             const QString &projectId, const QString &kind) {
+        PackFile file;
+        file.path = path;
+        file.url = QStringLiteral("https://example.invalid/") + path;
+        file.sha1 = QString(40, QLatin1Char('b'));
+        file.size = 1;
+        file.licenseId = license;
+        file.projectId = projectId;
+        file.projectName = projectId == QLatin1String("alpha") ? QStringLiteral("Alpha Mod")
+                                                               : QString();
+        file.kind = kind;
+        pack.files.append(file);
+    };
+    // Two artefacts of the same parent mod: one click must cover both.
+    add(QStringLiteral("mods/alpha.jar"), QString(), QStringLiteral("alpha"), QStringLiteral("mod"));
+    add(QStringLiteral("config/alpha.toml"), QStringLiteral("MIT"), QStringLiteral("alpha"),
+        QStringLiteral("config"));
+    // A second parent mod with a copyleft licence.
+    add(QStringLiteral("mods/beta.jar"), QStringLiteral("GPL-3.0-only"), QStringLiteral("beta"),
+        QStringLiteral("mod"));
+    // Launcher-installed files are not redistributed by a self-contained pack.
+    add(QStringLiteral("assets/objects/ab/cdef"), QString(), QString(), QStringLiteral("asset"));
+
+    const license::GateResult gate = license::evaluate(pack);
+    QVERIFY(!gate.verdicts.contains(QStringLiteral("assets/objects/ab/cdef")));
+    QCOMPARE(gate.groups.size(), 2);
+    QCOMPARE(gate.denied.size(), 1);
+    QCOMPARE(gate.deniedGroups.size(), 1);
+    QCOMPARE(gate.needsConfirmGroups.size(), 1);
+
+    int alphaIndex = -1;
+    for (int i = 0; i < gate.groups.size(); ++i) {
+        if (gate.groups[i].id == QLatin1String("@project:alpha"))
+            alphaIndex = i;
+    }
+    QVERIFY(alphaIndex >= 0);
+    QCOMPARE(gate.groups[alphaIndex].name, QStringLiteral("Alpha Mod"));
+    QCOMPARE(gate.groups[alphaIndex].fileCount, 2);
+    QCOMPARE(gate.groups[alphaIndex].pendingCount, 1);
+    QCOMPARE(gate.groups[alphaIndex].verdict, license::Verdict::Denied);
+
+    const license::GateResult confirmed = license::evaluate(pack, {QStringLiteral("@project:alpha")});
+    QCOMPARE(confirmed.verdicts.value(QStringLiteral("mods/alpha.jar")), license::Verdict::Allowed);
+    QCOMPARE(confirmed.verdicts.value(QStringLiteral("config/alpha.toml")), license::Verdict::Allowed);
+    QVERIFY(confirmed.deniedGroups.isEmpty());
+    QVERIFY(confirmed.exportable);
+}
 
 void TestPack::zipReaderRoundTrip()
 {
@@ -512,6 +572,46 @@ void TestPack::importCurseForgeManifest()
     QCOMPARE(result.unresolved.size(), 1);
     QVERIFY(result.unresolved.first().contains(QStringLiteral("unresolved.jar")));
     QCOMPARE(result.overrideCount, 1);
+}
+
+void TestPack::ftbEncodesUrlSpaces()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString archive = dir.filePath(QStringLiteral("ftb.zip"));
+    const QJsonObject manifest{
+        {QStringLiteral("name"), QStringLiteral("FTB Space")},
+        {QStringLiteral("version"), QStringLiteral("1.0")},
+        {QStringLiteral("targets"),
+         QJsonArray{QJsonObject{{QStringLiteral("type"), QStringLiteral("modloader")},
+                                {QStringLiteral("name"), QStringLiteral("forge")},
+                                {QStringLiteral("version"), QStringLiteral("14.23.5.2846")}},
+                    QJsonObject{{QStringLiteral("type"), QStringLiteral("game")},
+                                {QStringLiteral("name"), QStringLiteral("minecraft")},
+                                {QStringLiteral("version"), QStringLiteral("1.12.2")}}}},
+        {QStringLiteral("files"),
+         QJsonArray{QJsonObject{
+             {QStringLiteral("path"), QStringLiteral("mods/a b.jar")},
+             {QStringLiteral("downloads"),
+              QJsonArray{QStringLiteral("https://dist.example.invalid/FTB Academy-1.1.0/mods/a b.jar")}},
+             {QStringLiteral("hashes"),
+              QJsonArray{QJsonObject{{QStringLiteral("algo"), 1},
+                                     {QStringLiteral("value"), sha1Of(QByteArray("x"))}}}},
+             {QStringLiteral("fileSize"), 1},
+         }}},
+    };
+
+    ZipWriter writer(archive);
+    QVERIFY(writer.addData(QStringLiteral("manifest.json"), QJsonDocument(manifest).toJson(), true));
+    QVERIFY(writer.addData(QStringLiteral("overrides/.keep"), QByteArray(), true));
+    QVERIFY(writer.close());
+
+    const ImportResult result = importPackArchive(archive);
+    QVERIFY2(result.ok, qPrintable(result.error));
+    QCOMPARE(result.format, QStringLiteral("ftb"));
+    QCOMPARE(result.pack.files.size(), 1);
+    QCOMPARE(result.pack.files.first().url,
+             QStringLiteral("https://dist.example.invalid/FTB%20Academy-1.1.0/mods/a%20b.jar"));
 }
 
 void TestPack::instancesAreDiscovered()

@@ -12,6 +12,8 @@ struct PlanFile
     QString path;
     QString url;
     QString sha1;
+    QString sha256;
+    QString sha512;
     qint64 size = 0;
     QString kind; // client / library / asset / asset-index
 };

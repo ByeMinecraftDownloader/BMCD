@@ -5,6 +5,20 @@
 VersionFilterModel::VersionFilterModel(QObject *parent)
     : QSortFilterProxyModel(parent)
 {
+    const auto notifyCount = [this] { emit countChanged(); };
+    connect(this, &QAbstractItemModel::rowsInserted, this, notifyCount);
+    connect(this, &QAbstractItemModel::rowsRemoved, this, notifyCount);
+    connect(this, &QAbstractItemModel::modelReset, this, notifyCount);
+    connect(this, &QAbstractItemModel::layoutChanged, this, notifyCount);
+}
+
+int VersionFilterModel::indexOfVersion(const QString &versionId) const
+{
+    for (int row = 0; row < rowCount(); ++row) {
+        if (index(row, 0).data(VersionListModel::IdRole).toString() == versionId)
+            return row;
+    }
+    return -1;
 }
 
 void VersionFilterModel::setSearchText(const QString &text)
@@ -18,6 +32,7 @@ void VersionFilterModel::setSearchText(const QString &text)
 #else
     invalidateRowsFilter();
 #endif
+    emit countChanged();
     emit searchTextChanged();
 }
 
@@ -32,6 +47,7 @@ void VersionFilterModel::setChannel(const QString &channel)
 #else
     invalidateRowsFilter();
 #endif
+    emit countChanged();
     emit channelChanged();
 }
 

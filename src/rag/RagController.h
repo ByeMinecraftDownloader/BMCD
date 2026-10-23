@@ -18,6 +18,7 @@ class RagController : public QObject
 {
     Q_OBJECT
     QML_ELEMENT
+    QML_SINGLETON
     Q_PROPERTY(bool available READ available NOTIFY changed)
     Q_PROPERTY(int chunkCount READ chunkCount NOTIFY changed)
     Q_PROPERTY(QString embedderName READ embedderName NOTIFY changed)
@@ -27,13 +28,18 @@ public:
     explicit RagController(QObject *parent = nullptr);
     ~RagController() override;
 
-    bool available() const { return m_available; }
-    int chunkCount() const { return int(m_count); }
-    QString embedderName() const { return m_embedderName; }
-    QString lastNote() const { return m_lastNote; }
+    bool available() const;
+    int chunkCount() const;
+    QString embedderName() const;
+    QString lastNote() const;
 
     // Human readable "Title — snippet" entries for the current query.
     Q_INVOKABLE QStringList suggest(const QString &query, int top = 4);
+
+    // Structured results for the mod picker: project/slug, title, snippet,
+    // source URL and score, filtered by loader and Minecraft version.
+    Q_INVOKABLE QVariantList search(const QString &query, const QString &loader,
+                                    const QString &gameVersion, int top = 8);
     Q_INVOKABLE QVariantMap stats() const;
 
 signals:

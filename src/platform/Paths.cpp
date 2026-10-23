@@ -26,6 +26,11 @@ QString cacheDir()
     return dir.isEmpty() ? QDir::homePath() + QStringLiteral("/.cache/bmcd") : dir;
 }
 
+QString downloadsDir()
+{
+    return cacheDir() + QStringLiteral("/downloads");
+}
+
 QString configDir()
 {
     const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);

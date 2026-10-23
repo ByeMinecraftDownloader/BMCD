@@ -19,15 +19,31 @@
 
 namespace {
 
-QString sha1Of(const QString &path)
+QString digestOf(const QString &path, QCryptographicHash::Algorithm algorithm)
 {
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly))
         return {};
-    QCryptographicHash hash(QCryptographicHash::Sha1);
+    QCryptographicHash hash(algorithm);
     if (!hash.addData(&file))
         return {};
     return QString::fromLatin1(hash.result().toHex());
+}
+
+QString sha1Of(const QString &path)
+{
+    return digestOf(path, QCryptographicHash::Sha1);
+}
+
+bool matchesStrongestHash(const PackFile &file, const QString &path)
+{
+    if (!file.sha256.isEmpty())
+        return digestOf(path, QCryptographicHash::Sha256) == file.sha256;
+    if (!file.sha512.isEmpty())
+        return digestOf(path, QCryptographicHash::Sha512) == file.sha512;
+    if (!file.sha1.isEmpty())
+        return digestOf(path, QCryptographicHash::Sha1) == file.sha1;
+    return true;
 }
 
 QString uniqueStamp()
@@ -176,6 +192,8 @@ DeployReport deploy(const Pack &pack, const DeployOptions &options, const QStrin
     };
 
     for (const PackFile &file : pack.files) {
+        if (!file.selected || !file.enabled)
+            continue; // only the current recipe is downloaded, deployed and exported
         if (overridePaths.contains(file.path))
             continue; // the bundled override wins over the downloadable copy
         if (file.optional && !file.clientSide && !confirmedSet.contains(file.path))
@@ -220,7 +238,7 @@ DeployReport deploy(const Pack &pack, const DeployOptions &options, const QStrin
         const QString stagedPath = QDir(report.stagingDir).filePath(file.path);
         QDir().mkpath(QFileInfo(stagedPath).absolutePath());
         if (!platform::copyFile(sourceOf.value(file.path), stagedPath)
-            || (!file.sha1.isEmpty() && sha1Of(stagedPath) != file.sha1)) {
+            || !matchesStrongestHash(file, stagedPath)) {
             report.error = QStringLiteral("暂存失败：%1").arg(file.path);
             QDir(report.stagingDir).removeRecursively();
             return report;
