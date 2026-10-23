@@ -28,7 +28,7 @@ APPIMAGETOOL="$TOOLS/appimagetool-$ARCH.AppImage"
 export APPIMAGE_EXTRACT_AND_RUN=1
 export ARCH
 
-# docs/plan.md 1.5.1: the published AppImage must run on Ubuntu 22.04. Building
+# The published AppImage must run on Ubuntu 22.04. Building
 # on a newer distro silently binds to a newer glibc, so refuse that by default;
 # CI builds on ubuntu-22.04 and packaging/smoke-artifact.sh checks the result.
 GLIBC_BASELINE=${BMCD_GLIBC_BASELINE:-2.35}
@@ -44,7 +44,7 @@ if [[ -n $GLIBC_HOST ]] && \
 fi
 
 for tool in "$LINUXDEPLOY" "$QT_PLUGIN" "$APPIMAGETOOL"; do
-    [[ -x $tool ]] || { echo "missing tool: $tool (see packaging/README.md)" >&2; exit 1; }
+    [[ -x $tool ]] || { echo "missing tool: $tool (set BMCD_TOOLS to a directory containing the AppImage tools)" >&2; exit 1; }
 done
 
 QT_QMAKE=${QT_QMAKE:-$(command -v qmake6 || command -v qmake)}

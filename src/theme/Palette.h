@@ -36,7 +36,7 @@ class Palette : public QObject
     Q_PROPERTY(QColor link READ link NOTIFY changed)
 
     // Token surface added for the 1.0 token contract. Kept separate from the
-    // legacy properties so qml/Main.qml (0.4) keeps compiling unchanged.
+    // legacy palette properties consumed by Tokens.qml.
     Q_PROPERTY(QColor surfaceContainer READ surfaceContainer NOTIFY changed)
     Q_PROPERTY(QColor surfaceContainerHigh READ surfaceContainerHigh NOTIFY changed)
     Q_PROPERTY(QColor primaryContainer READ primaryContainer NOTIFY changed)

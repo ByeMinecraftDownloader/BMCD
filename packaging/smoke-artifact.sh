@@ -5,7 +5,7 @@
 #   packaging/smoke-artifact.sh flatpak
 #   packaging/smoke-artifact.sh binary [path/to/bmcd]
 #
-# Every mode runs the same acceptance commands from docs/plan.md 1.5.1:
+# Every mode runs the same set of acceptance commands:
 # --version, --i18n-check, and one offscreen UI start. No display or network
 # is required for these checks.
 set -euo pipefail

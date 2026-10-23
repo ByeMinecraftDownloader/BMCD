@@ -47,4 +47,3 @@ modules:
           - dist
           - .tools
           - .git
-          - tests/pack-corpus
